@@ -93,22 +93,66 @@ try:
 	output = subprocess.check_output(["blastn", "-version"])
 except:
 	print('BLAST is not installed on the computer. Please install BLAST to run the program')
+	logComment('BLAST is not installed on the computer, program terminated')
 	exit()
-	
+
 logComment("BLAST version: " + output.decode(sys.stdout.encoding).split('\n')[0])
 
-# Read MIC fasta file (We might need to surround with try/except block for error checking!!!!!!!!!!!!!)
-mic_fasta = Fasta(MICfile)
+# Create BLAST database (and directory), if it doesn't exist
+safeCreateDirectory(Output_dir + '/blast')
+if not os.path.exists(Output_dir + '/blast/mic.nsq'):
+	logComment('Building BLAST database from' + MICfile)
+	output = subprocess.check_output(["makeblastdb", "-in", MICfile, '-out', Output_dir + '/blast/mic', '-dbtype', 'nucl', '-parse_seqids', '-hash_index'])
+	logComment(output.decode(sys.stdout.encoding))
+else:
+	logComment("BLAST database for " + MICfile + " found")
 
-if DEBUGGING:
-	print(list(mic_fasta.keys()))
-
-#Read MAC fasta file
-mac_fasta = Fasta(MACfile)
+# Import MAC fasta file
+logComment('Importing MAC fasta file...')
+mac_fasta = None
+try:
+	mac_fasta = Fasta(MACfile)
+except Exception as e:
+	print("Error while importing fasta file\n" + str(e))
+	logComment("Can't import fasta file\n" + str(e))
+	exit()
 
 if DEBUGGING:
 	print(list(mac_fasta.keys()))
 
+# Record number of imported MAC contigs
+macCount = len(mac_fasta.keys())
+logComment(str(macCount) + ' sequences imported')
+
+# Create hsp, hsp/rough, hsp/fine directtories
+safeCreateDirectory(Output_dir + '/hsp')
+safeCreateDirectory(Output_dir + '/hsp/rough')
+safeCreateDirectory(Output_dir + '/hsp/fine')
+
+# Start BLASTing and annotating
+logComment('Annotating ' + str(macCount) + ' MAC contigs...')
+
+for contig in mac_fasta:
+	# create file for masked telomeres
+	maskTel_file = open(Output_dir + '/hsp/rough/masked_' + str(contig) + '.fa', 'w')
+	
+	# Run regular expression and mask telomeres
+	seq = str(mac_fasta[contig])
+	telomeres = re_comp.finditer(seq)
+	str_pos = 0
+	for iter in telomeres:
+		coord = iter.span()
+		if(str_pos != coord[0]):
+			maskTel_file.write(seq[str_pos:coord[0]].upper())
+		maskTel_file.write(seq[coord[0]:coord[1]].lower())
+		str_pos = coord[1]
+	if str_pos != len(seq):
+		maskTel_file.write(seq[str_pos:len(seq)].upper())
+	
+	# Close masked contig file
+	maskTel_file.close()
+	
+	# Run BLAST
 
 # Close all files
 LogFile.close()
