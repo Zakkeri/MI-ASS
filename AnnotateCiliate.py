@@ -9,6 +9,7 @@ import sys
 from io import StringIO
 from subprocess import call
 from pyfasta import Fasta
+from settings import *
 
 # Debugging
 DEBUGGING = True
@@ -90,7 +91,7 @@ if DEBUGGING:
 output = None
 try:
 	#call('blastn -version')
-	output = subprocess.check_output(["blastn", "-version"])
+	output = subprocess.check_output("blastn -version")
 except:
 	print('BLAST is not installed on the computer. Please install BLAST to run the program')
 	logComment('BLAST is not installed on the computer, program terminated')
@@ -102,7 +103,7 @@ logComment("BLAST version: " + output.decode(sys.stdout.encoding).split('\n')[0]
 safeCreateDirectory(Output_dir + '/blast')
 if not os.path.exists(Output_dir + '/blast/mic.nsq'):
 	logComment('Building BLAST database from' + MICfile)
-	output = subprocess.check_output(["makeblastdb", "-in", MICfile, '-out', Output_dir + '/blast/mic', '-dbtype', 'nucl', '-parse_seqids', '-hash_index'])
+	output = subprocess.check_output("makeblastdb -in " + str(MICfile) + ' -out ' +  Output_dir + '/blast/mic -dbtype nucl -parse_seqids -hash_index')
 	logComment(output.decode(sys.stdout.encoding))
 else:
 	logComment("BLAST database for " + MICfile + " found")
@@ -152,8 +153,16 @@ for contig in mac_fasta:
 	# Close masked contig file
 	maskTel_file.close()
 	
-	# Run BLAST
-
+	# Run Rough BLAST pass
+	rough_out = subprocess.check_output("blastn -task " + Options['RoughBlastTask'] + " -word_size " + str(Options['RoughBlastWordSize']) + " -max_hsps 0 " + 
+	"-max_target_seqs 10000 -dust no -ungapped -lcase_masking -query " + Output_dir + "/hsp/rough/masked_" + str(contig) + ".fa -db " + Output_dir + "/blast/mic " +
+	"-num_threads 2 -outfmt \"10 qseqid sseqid pident length mismatch gapopen qstart qend sstart sendevalue bitscore qcovs qcovs\"")
+	
+	# Save results to file
+	rough_file = open(Output_dir + '/hsp/rough/' + str(contig) + '.csv', 'w')
+	rough_file.write(rough_out.decode(sys.stdout.encoding))
+	rough_file.close()
+	
 # Close all files
 LogFile.close()
 
