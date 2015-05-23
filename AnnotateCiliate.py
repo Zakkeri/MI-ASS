@@ -136,6 +136,7 @@ logComment('Annotating ' + str(macCount) + ' MAC contigs...')
 for contig in mac_fasta:
 	# create file for masked telomeres
 	maskTel_file = open(Output_dir + '/hsp/rough/masked_' + str(contig) + '.fa', 'w')
+	maskTel_file.write(">" + str(contig) + "\n")
 	
 	# Run regular expression and mask telomeres
 	seq = str(mac_fasta[contig])
@@ -163,9 +164,14 @@ for contig in mac_fasta:
 	Output_dir + "/blast/mic -num_threads " + str(Options['ThreadCount']) + 
 	" -outfmt \"10 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore qcovs\"")
 	
+	# Filter empty rows
+	roughVal = [x.rstrip() for x in rough_out.decode(sys.stdout.encoding).split('\n') if x != ""]
+		
 	# Save rough results to file
 	rough_file = open(Output_dir + '/hsp/rough/' + str(contig) + '.csv', 'w')
-	rough_file.write(rough_out.decode(sys.stdout.encoding))
+	for x in roughVal[:-1]:
+		rough_file.write(x + '\n')
+	rough_file.write(roughVal[-1])	
 	rough_file.close()
 	
 	# Run Fine BLAST pass
@@ -177,10 +183,22 @@ for contig in mac_fasta:
 	"-db " + Output_dir + "/blast/mic " +
 	"-outfmt \"10 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore qcovs\"" + " -num_threads " + str(Options['ThreadCount']))
 	
+	# Filter empty rows
+	fineVal = [x.rstrip() for x in fine_out.decode(sys.stdout.encoding).split('\n') if x != ""]
+	
 	# Save fine results to file
 	fine_file = open(Output_dir + '/hsp/fine/' + str(contig) + '.csv', 'w')
-	fine_file.write(fine_out.decode(sys.stdout.encoding))
+	for x in fineVal[:-1]:
+		fine_file.write(x + "\n")
+	fine_file.write(fineVal[-1])
 	fine_file.close()
+	
+	# Remove temp file
+	os.remove(Output_dir + "/hsp/rough/masked_" + str(contig) + ".fa")
+	
+	# Combine result of rough and fine blast and remove duplicates
+	hsp = list(set(roughVal).union(set(fineVal)))
+	
 	
 # Close all files
 LogFile.close()
