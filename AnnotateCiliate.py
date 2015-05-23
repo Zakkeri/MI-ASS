@@ -154,14 +154,33 @@ for contig in mac_fasta:
 	maskTel_file.close()
 	
 	# Run Rough BLAST pass
-	rough_out = subprocess.check_output("blastn -task " + Options['RoughBlastTask'] + " -word_size " + str(Options['RoughBlastWordSize']) + " -max_hsps 0 " + 
-	"-max_target_seqs 10000 -dust no -ungapped -lcase_masking -query " + Output_dir + "/hsp/rough/masked_" + str(contig) + ".fa -db " + Output_dir + "/blast/mic " +
-	"-num_threads 2 -outfmt \"10 qseqid sseqid pident length mismatch gapopen qstart qend sstart sendevalue bitscore qcovs qcovs\"")
+	dust = "yes" if Options['RoughBlastDust'] else "no"
+	ungapped = " -ungapped " if Options['RoughBlastUngapped'] else ""
+	maskLowercase = " -lcase_masking " if Options['BlastMaskLowercase'] else ""
 	
-	# Save results to file
+	rough_out = subprocess.check_output("blastn -task " + Options['RoughBlastTask'] + " -word_size " + str(Options['RoughBlastWordSize']) + " -max_hsps 0 " +
+	"-max_target_seqs 10000 -dust " + dust + ungapped + maskLowercase + "-query " + Output_dir + "/hsp/rough/masked_" + str(contig) + ".fa -db " +
+	Output_dir + "/blast/mic -num_threads " + str(Options['ThreadCount']) + 
+	" -outfmt \"10 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore qcovs\"")
+	
+	# Save rough results to file
 	rough_file = open(Output_dir + '/hsp/rough/' + str(contig) + '.csv', 'w')
 	rough_file.write(rough_out.decode(sys.stdout.encoding))
 	rough_file.close()
+	
+	# Run Fine BLAST pass
+	dust = "yes" if Options['FineBlastDust'] else "no"
+	ungapped = " -ungapped " if Options['FineBlastUngapped'] else ""
+		
+	fine_out = subprocess.check_output("blastn -task " + Options['FineBlastTask'] + " -word_size " + str(Options['FineBlastWordSize']) + " -max_hsps 0 " + 
+	"-max_target_seqs 10000 -dust " + dust + ungapped + maskLowercase + "-query " + Output_dir + "/hsp/rough/masked_" + str(contig) + ".fa " +
+	"-db " + Output_dir + "/blast/mic " +
+	"-outfmt \"10 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore qcovs\"" + " -num_threads " + str(Options['ThreadCount']))
+	
+	# Save fine results to file
+	fine_file = open(Output_dir + '/hsp/fine/' + str(contig) + '.csv', 'w')
+	fine_file.write(fine_out.decode(sys.stdout.encoding))
+	fine_file.close()
 	
 # Close all files
 LogFile.close()
