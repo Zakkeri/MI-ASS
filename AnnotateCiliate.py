@@ -9,6 +9,7 @@ import sys
 from io import StringIO
 from subprocess import call
 from pyfasta import Fasta
+from operator import itemgetter
 from settings import *
 
 # Debugging
@@ -130,6 +131,23 @@ safeCreateDirectory(Output_dir + '/hsp')
 safeCreateDirectory(Output_dir + '/hsp/rough')
 safeCreateDirectory(Output_dir + '/hsp/fine')
 
+# Rough Blast parameters
+dust = "yes" if Options['RoughBlastDust'] else "no"
+ungapped = " -ungapped " if Options['RoughBlastUngapped'] else ""
+maskLowercase = " -lcase_masking " if Options['BlastMaskLowercase'] else ""
+	
+logComment("BLAST rough pass parameters:\nblastn -task " + Options['RoughBlastTask'] + " -word_size " + str(Options['RoughBlastWordSize']) + " -max_hsps 0 " +
+"-max_target_seqs 10000 -dust " + dust + ungapped + maskLowercase + "-num_threads " + str(Options['ThreadCount']) + 
+" -outfmt \"10 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore qcovs\"\n")
+
+#Fine Blast parameters
+dust = "yes" if Options['FineBlastDust'] else "no"
+ungapped = " -ungapped " if Options['FineBlastUngapped'] else ""
+	
+logComment("BLAST fine pass parameters:\nblastn -task " + Options['FineBlastTask'] + " -word_size " + str(Options['FineBlastWordSize']) + " -max_hsps 0 " + 
+"-max_target_seqs 10000 -dust " + dust + ungapped + maskLowercase + 
+"-outfmt \"10 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore qcovs\"" + " -num_threads " + str(Options['ThreadCount']) + "\n")
+	
 # Start BLASTing and annotating
 logComment('Annotating ' + str(macCount) + ' MAC contigs...')
 
@@ -158,7 +176,7 @@ for contig in mac_fasta:
 	dust = "yes" if Options['RoughBlastDust'] else "no"
 	ungapped = " -ungapped " if Options['RoughBlastUngapped'] else ""
 	maskLowercase = " -lcase_masking " if Options['BlastMaskLowercase'] else ""
-	
+
 	rough_out = subprocess.check_output("blastn -task " + Options['RoughBlastTask'] + " -word_size " + str(Options['RoughBlastWordSize']) + " -max_hsps 0 " +
 	"-max_target_seqs 10000 -dust " + dust + ungapped + maskLowercase + "-query " + Output_dir + "/hsp/rough/masked_" + str(contig) + ".fa -db " +
 	Output_dir + "/blast/mic -num_threads " + str(Options['ThreadCount']) + 
@@ -177,7 +195,7 @@ for contig in mac_fasta:
 	# Run Fine BLAST pass
 	dust = "yes" if Options['FineBlastDust'] else "no"
 	ungapped = " -ungapped " if Options['FineBlastUngapped'] else ""
-		
+
 	fine_out = subprocess.check_output("blastn -task " + Options['FineBlastTask'] + " -word_size " + str(Options['FineBlastWordSize']) + " -max_hsps 0 " + 
 	"-max_target_seqs 10000 -dust " + dust + ungapped + maskLowercase + "-query " + Output_dir + "/hsp/rough/masked_" + str(contig) + ".fa " +
 	"-db " + Output_dir + "/blast/mic " +
@@ -197,7 +215,13 @@ for contig in mac_fasta:
 	os.remove(Output_dir + "/hsp/rough/masked_" + str(contig) + ".fa")
 	
 	# Combine result of rough and fine blast and remove duplicates
-	hsp = list(set(roughVal).union(set(fineVal)))
+	res = [x.split(',') for x in list(set(roughVal).union(set(fineVal)))]
+		
+	# Sort list by 1) MIC contig; 2) Coverage; 3) Bitscore
+	def srt(a):
+		return (a[1], float(a[12]), float(a[11]))
+		
+	hsp = sorted(res, key=srt)
 	
 	
 # Close all files
