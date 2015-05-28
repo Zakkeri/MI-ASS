@@ -138,7 +138,7 @@ maskLowercase = " -lcase_masking " if Options['BlastMaskLowercase'] else ""
 	
 logComment("BLAST rough pass parameters:\nblastn -task " + Options['RoughBlastTask'] + " -word_size " + str(Options['RoughBlastWordSize']) + " -max_hsps 0 " +
 "-max_target_seqs 10000 -dust " + dust + ungapped + maskLowercase + "-num_threads " + str(Options['ThreadCount']) + 
-" -outfmt \"10 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore qcovs\"\n")
+" -outfmt \"10 qseqid sseqid pident length mismatch qstart qend sstart send evalue bitscore qcovs\"\n")
 
 #Fine Blast parameters
 dust = "yes" if Options['FineBlastDust'] else "no"
@@ -146,8 +146,11 @@ ungapped = " -ungapped " if Options['FineBlastUngapped'] else ""
 	
 logComment("BLAST fine pass parameters:\nblastn -task " + Options['FineBlastTask'] + " -word_size " + str(Options['FineBlastWordSize']) + " -max_hsps 0 " + 
 "-max_target_seqs 10000 -dust " + dust + ungapped + maskLowercase + 
-"-outfmt \"10 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore qcovs\"" + " -num_threads " + str(Options['ThreadCount']) + "\n")
-	
+"-outfmt \"10 qseqid sseqid pident length mismatch qstart qend sstart send evalue bitscore qcovs\"" + " -num_threads " + str(Options['ThreadCount']) + "\n")
+
+# Create output directory for MAC mds
+safeCreateDirectory(Output_dir + '/Annotated_MDS')	
+
 # Start BLASTing and annotating
 logComment('Annotating ' + str(macCount) + ' MAC contigs...')
 
@@ -159,12 +162,14 @@ for contig in mac_fasta:
 	# Run regular expression and mask telomeres
 	seq = str(mac_fasta[contig])
 	telomeres = re_comp.finditer(seq)
+	tell_pos = list()
 	str_pos = 0
 	for iter in telomeres:
 		coord = iter.span()
 		if(str_pos != coord[0]):
 			maskTel_file.write(seq[str_pos:coord[0]].upper())
 		maskTel_file.write(seq[coord[0]:coord[1]].lower())
+		tell_pos.append((coord[0], coord[1]))
 		str_pos = coord[1]
 	if str_pos != len(seq):
 		maskTel_file.write(seq[str_pos:len(seq)].upper())
@@ -180,7 +185,7 @@ for contig in mac_fasta:
 	rough_out = subprocess.check_output("blastn -task " + Options['RoughBlastTask'] + " -word_size " + str(Options['RoughBlastWordSize']) + " -max_hsps 0 " +
 	"-max_target_seqs 10000 -dust " + dust + ungapped + maskLowercase + "-query " + Output_dir + "/hsp/rough/masked_" + str(contig) + ".fa -db " +
 	Output_dir + "/blast/mic -num_threads " + str(Options['ThreadCount']) + 
-	" -outfmt \"10 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore qcovs\"")
+	" -outfmt \"10 qseqid sseqid pident length mismatch qstart qend sstart send evalue bitscore qcovs\"")
 	
 	# Filter empty rows
 	roughVal = [x.rstrip() for x in rough_out.decode(sys.stdout.encoding).split('\n') if x != ""]
@@ -199,7 +204,7 @@ for contig in mac_fasta:
 	fine_out = subprocess.check_output("blastn -task " + Options['FineBlastTask'] + " -word_size " + str(Options['FineBlastWordSize']) + " -max_hsps 0 " + 
 	"-max_target_seqs 10000 -dust " + dust + ungapped + maskLowercase + "-query " + Output_dir + "/hsp/rough/masked_" + str(contig) + ".fa " +
 	"-db " + Output_dir + "/blast/mic " +
-	"-outfmt \"10 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore qcovs\"" + " -num_threads " + str(Options['ThreadCount']))
+	"-outfmt \"10 qseqid sseqid pident length mismatch qstart qend sstart send evalue bitscore qcovs\"" + " -num_threads " + str(Options['ThreadCount']))
 	
 	# Filter empty rows
 	fineVal = [x.rstrip() for x in fine_out.decode(sys.stdout.encoding).split('\n') if x != ""]
@@ -211,6 +216,87 @@ for contig in mac_fasta:
 	fine_file.write(fineVal[-1])
 	fine_file.close()
 	
+	# Combine result of rough and fine blast and remove duplicates
+	res = [x.split(',') for x in list(set(roughVal).union(set(fineVal)))]
+		
+	# Split list according to MIC contigs and sort every splitted entry
+	MIC_maps = list()
+	for mic in {x[1] for x in res}:
+		temp = sorted([hsp for hsp in res if hsp[1] == mic], key=lambda x: int(x[5]))
+		MIC_maps.append(temp)
+	
+	# Get MAC start and MAC end with respect to telomeres
+	MAC_start = 0
+	MAC_end = len(mac_fasta[contig])
+	if len(tell_pos) >= 2:
+		MAC_start = int(tell_pos[0][1])
+		MAC_end = int(tell_pos[-1][0])
+	elif len(tell_pos) == 1:
+		if int(tell_pos[0][0]) < MAC_end - int(tell_pos[0][1]):
+			MAC_start = int(tell_pos[0][1])
+		else:
+			MAC_end = int(tell_pos[0][0])
+	#Debuging message		
+	#print(contig, " start: ", MAC_start, " end: ", MAC_end)
+	
+	# Sort MIC maps by coverage
+	MIC_maps.sort(key=lambda x: float(x[0][11]))
+	
+	# Build list of MDSs
+	MDS_List = list()
+	for mic in MIC_maps:
+		for hsp in mic:
+			mds_toAdd = (int(hsp[5]), int(hsp[6]),1)
+			# Check if it is a subset of some MDS and skip it if it does
+			if [x for x in MDS_List if mds_toAdd[0] >= x[0] and mds_toAdd[1] <= x[1]]:
+				continue
+			
+			# Get list of hsp that overlap with hsp that we are trying to add
+			overlap = [x for x in MDS_List if (x[0] > mds_toAdd[0] and x[0] < mds_toAdd[1]) or (x[1] > mds_toAdd[0] and x[1] < mds_toAdd[1])]
+			toAdd = False
+			
+			# If overlap is empty, then add MDS
+			if not overlap:
+				toAdd = True
+			# Go through current MDSs and see if any can be made longer
+			else:
+				for x in sorted(overlap, key=lambda x: x[0]):
+					if (mds_toAdd[0] + mds_toAdd[1])/2 in range(x[0], x[1]):
+						mds_toAdd[0] = min(mds_toAdd[0], x[0])
+						mds_toAdd[1] = max(mds_toAdd[1], x[1])
+						MDS_List.remove(x)
+						toAdd = True
+			
+			if toAdd:
+				MDS_List.append(mds_toAdd)
+	
+	# Get the list of covered MAC Interval(s)
+	MAC_Interval = list()
+	for mds in sorted(MDS_List, key = lambda x: x[0]):
+		if not MAC_Interval:
+			MAC_Interval.append(mds)
+		else:
+			if MAC_Interval[-1][1] >= mds[0]:
+				MAC_Interval[-1][1] = mds[1]
+			else:
+				MAC_Interval.append(mds)
+	# If we only have more than one interval, then there are gaps we need to add to the annotation
+	if len(MAC_Interval) > 1:
+		prev = MAC_Interval[0]
+		for interv in MAC_Interval[1:]:
+			MDS_List.append((prev[1], interv[0],0))
+			prev = interv
+	
+	# Output results
+	MDS_file = open(Output_dir + '/Annotated_MDS/' + str(contig) + '.tsv', 'w')
+	ind = 1
+	MDS_List = sorted(MDS_List, key = lambda x: x[0])
+	for mds in MDS_List[:-1]:
+		MDS_file.write(str(ind) + '\t' + str(mds[0]) + '\t' + str(mds[1]) + '\t' + str(mds[2]) + '\n')
+		ind += 1
+	MDS_file.write(str(ind) + '\t' + str(MDS_List[-1][0]) + '\t' + str(MDS_List[-1][1]) + '\t' + str(MDS_List[-1][2]))
+	MDS_file.close()
+	"""
 	# Remove temp file
 	os.remove(Output_dir + "/hsp/rough/masked_" + str(contig) + ".fa")
 	
@@ -219,10 +305,10 @@ for contig in mac_fasta:
 		
 	# Sort list by 1) MIC contig; 2) Coverage; 3) Bitscore
 	def srt(a):
-		return (a[1], float(a[12]), float(a[11]))
+		return (a[1], float(a[11]), float(a[10]))
 		
 	hsp = sorted(res, key=srt)
-	
+	"""
 	
 # Close all files
 LogFile.close()
