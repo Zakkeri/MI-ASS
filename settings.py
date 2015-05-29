@@ -15,7 +15,7 @@ Options = {
 'RoughBlastUngapped' : True,
 'RoughCoverageLimit' : 5,
 'FineBlastTask' : 'blastn-short',
-'FineBlastWordSize' : 15,
+'FineBlastWordSize' : 12,
 'FineBlastDust' : False,
 'FineBlastUngapped' : True,
 'ThreadCount' : 2*multiprocessing.cpu_count(),
