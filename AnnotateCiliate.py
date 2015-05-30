@@ -229,7 +229,9 @@ for contig in mac_fasta:
 	for mic in {x[1] for x in res}:
 		temp = sorted([hsp for hsp in res if hsp[1] == mic], key=lambda x: int(x[5]))
 		MIC_maps.append(temp)
-	
+	for mic in MIC_maps:
+		mic.sort(key=lambda x: float(x[11]), reverse=True)
+		
 	# Get MAC start and MAC end with respect to telomeres
 	MAC_start = 0
 	MAC_end = len(mac_fasta[contig])
@@ -245,12 +247,13 @@ for contig in mac_fasta:
 	#print(contig, " start: ", MAC_start, " end: ", MAC_end)
 	
 	# Build list of MDSs
-	print("Calling getMDS_List function\n")
+	#print("Calling getMDS_List function\n")
 	MDS_List = getMDS_List(MIC_maps)	
-	for mic in MIC_maps:
-		for hsp in mic:
-			print(hsp)
-	print("\n\n")
+	
+	#for mic in MIC_maps:
+	#	for hsp in mic:
+	#		print(hsp)
+	#print("\n\n")
 	# Check for gaps and add them to the MDS List
 	addGaps(MDS_List, MAC_start, MAC_end)	
 		
@@ -286,11 +289,11 @@ for contig in mac_fasta:
 			if (min(matched_MDS[1], int(hsp[6])) - max(matched_MDS[0], int(hsp[5])))/(matched_MDS[1] - matched_MDS[0]) >= Options['MIC_Annotation_MDS_Overlap_Threshold']:
 				hsp[-1] = matched_MDS[-1]
 	
-	print("Annotated MIC\n")
-	for mic in MIC_maps:
-		for hsp in mic:
-			print(hsp)
-	print("\n\n")
+	#print("Annotated MIC\n")
+	#for mic in MIC_maps:
+	#	for hsp in mic:
+	#		print(hsp)
+	#print("\n\n")
 	# Prepare and Output MIC annotation results
 	MIC = list()
 	for mic in MIC_maps:

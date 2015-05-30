@@ -7,13 +7,16 @@
 def getMDS_List(MIC_maps):
 	MDS_List = list()
 	
+	#print('Before sorting: ', MIC_maps)
 	# Sort MIC maps by coverage
-	MIC_maps.sort(key=lambda x: float(x[0][11]))
-	
+	MIC_maps.sort(key=lambda x: float(x[0][11]), reverse=True)
+	#print('After sorting: ',MIC_maps)
+	#print('Working with ', str(MIC_maps[0][0]), '\n')
 	# Build list of MDSs
 	for mic in MIC_maps:
 		for hsp in mic:
 			mds_toAdd = [int(hsp[5]), int(hsp[6]),1]
+			#print("Considering: ", mds_toAdd)
 			# Check if it is a subset of some MDS and skip it if it does
 			if [x for x in MDS_List if mds_toAdd[0] >= x[0] and mds_toAdd[1] <= x[1]]:
 				continue
@@ -24,29 +27,35 @@ def getMDS_List(MIC_maps):
 			
 			# If overlap is empty, then add MDS
 			if not overlap:
+				#print("No overlap, just add")
 				toAdd = True
 			# Go through current MDSs and see if any can be made longer
 			else:
 				for x in sorted(overlap, key=lambda x: x[0]):
 					# Check if two MDSs can be merged
 					if (mds_toAdd[0] + mds_toAdd[1])/2 in range(x[0], x[1]):
+						#print("Can merge two MDSs")
 						mds_toAdd[0] = min(mds_toAdd[0], x[0])
 						mds_toAdd[1] = max(mds_toAdd[1], x[1])
+						#print("Removing: ", x)
 						MDS_List.remove(x)
 						toAdd = True
 					# Check if non-overlapping hsp portion overlaps with some other MDS and if it doesn't, then add it
 					# Overlap is on the left
 					elif mds_toAdd[0] < x[0]:
-						sub_overlap = [y for y in MDS_List if (y[0] > mds_toAdd[0] and y[0] < x[0]) or (y[1] > mds_toAdd[0] and y[1] < x[0])]
+						#print("Overlap on the left")
+						sub_overlap = [y for y in MDS_List if (y[1] > mds_toAdd[0]) and (y[1] < x[1])]
 						if not sub_overlap:
 							toAdd = True
 					# Overlap is on the right
 					else:
-						sub_overlap = [y for y in MDS_List if (y[0] > x[1] and y[0] < mds_toAdd[1]) or (y[1] > x[1] and y[1] < mds_toAdd[1])]
+						#print("Overlap on the right")
+						sub_overlap = [y for y in MDS_List if (y[0] > x[0] and y[0] < mds_toAdd[1])]
 						if not sub_overlap:
 							toAdd = True
 							
 			if toAdd:
+				#print("Adding: ", mds_toAdd)
 				MDS_List.append(mds_toAdd)
 	
 	return MDS_List
