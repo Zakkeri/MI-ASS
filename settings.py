@@ -19,5 +19,6 @@ Options = {
 'FineBlastDust' : False,
 'FineBlastUngapped' : True,
 'ThreadCount' : 2*multiprocessing.cpu_count(),
-'DatabaseUpdate' : True
+'DatabaseUpdate' : True,
+'MIC_Annotation_MDS_Overlap_Threshold' : .6
 }

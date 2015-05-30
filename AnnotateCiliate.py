@@ -10,6 +10,7 @@ from io import StringIO
 from subprocess import call
 from pyfasta import Fasta
 from operator import itemgetter
+from functools import reduce
 from settings import *
 from EssentialFunctions import *
 
@@ -152,6 +153,9 @@ logComment("BLAST fine pass parameters:\nblastn -task " + Options['FineBlastTask
 # Create output directory for MAC mds
 safeCreateDirectory(Output_dir + '/Annotated_MDS')	
 
+# Create output directory for MIC annotation
+safeCreateDirectory(Output_dir + '/MIC_Annotation')	
+
 # Start BLASTing and annotating
 logComment('Annotating ' + str(macCount) + ' MAC contigs...')
 
@@ -241,22 +245,69 @@ for contig in mac_fasta:
 	#print(contig, " start: ", MAC_start, " end: ", MAC_end)
 	
 	# Build list of MDSs
+	print("Calling getMDS_List function\n")
 	MDS_List = getMDS_List(MIC_maps)	
-	
+	for mic in MIC_maps:
+		for hsp in mic:
+			print(hsp)
+	print("\n\n")
 	# Check for gaps and add them to the MDS List
 	addGaps(MDS_List, MAC_start, MAC_end)	
 		
-	# Output results
+	# Output results and label MDSs
 	MDS_file = open(Output_dir + '/Annotated_MDS/' + str(contig) + '.tsv', 'w')
 	ind = 1
 	MDS_List = sorted(MDS_List, key = lambda x: x[0])
 	
 	for mds in MDS_List[:-1]:
 		MDS_file.write(str(ind) + '\t' + str(mds[0]) + '\t' + str(mds[1]) + '\t' + str(mds[2]) + '\n')
+		mds.append(ind)
 		ind += 1
 	MDS_file.write(str(ind) + '\t' + str(MDS_List[-1][0]) + '\t' + str(MDS_List[-1][1]) + '\t' + str(MDS_List[-1][2]))
+	MDS_List[-1].append(ind)
 	MDS_file.close()
 	
+	# Annotate MIC with current MDS list
+	for mic in MIC_maps:
+		for hsp in mic:
+			# Set hsp to no MDS for now
+			hsp.append(-1)
+			
+			# Get list of MDSs that were mapped from current hsp
+			overlap = [x for x in MDS_List if ((int(hsp[5]) <= x[0] and int(hsp[6]) > x[0]) or (int(hsp[5]) < x[1] and int(hsp[6]) >= x[1])) and (x[2] != 0)]
+			if not overlap:
+				continue
+			
+			# Define reduce function to decide what MDS the hsp is going to match the best
+			match = lambda a, b: a if (min(a[1], int(hsp[6])) - (max(a[0], int(hsp[5])))) > (min(b[1], int(hsp[6])) - (max(b[0], int(hsp[5])))) else b
+			matched_MDS = reduce(match, overlap)
+			
+			# check if the percentage of the overlap is above the threshold and label hsp if it does
+			if (min(matched_MDS[1], int(hsp[6])) - max(matched_MDS[0], int(hsp[5])))/(matched_MDS[1] - matched_MDS[0]) >= Options['MIC_Annotation_MDS_Overlap_Threshold']:
+				hsp[-1] = matched_MDS[-1]
+	
+	print("Annotated MIC\n")
+	for mic in MIC_maps:
+		for hsp in mic:
+			print(hsp)
+	print("\n\n")
+	# Prepare and Output MIC annotation results
+	MIC = list()
+	for mic in MIC_maps:
+		MIC.append(list())
+		for hsp in mic:
+			entry = [hsp[1], str(contig), hsp[5], hsp[6], hsp[7], hsp[8], hsp[-1]]
+			if(hsp[-1]) != -1 and entry not in MIC[-1]:
+				MIC[-1].append(entry)
+		MIC[-1].sort(key=lambda x: int(x[4]))
+	
+	MIC_file = open(Output_dir + '/MIC_Annotation/' + str(contig) + '.tsv', 'w')
+	for mic in MIC:
+		MIC_file.write(mic[0][0] + '\tMDS\tMAC start\tMAC end\tMIC start\tMIC end\n')
+		for mds in mic:
+			MIC_file.write('\t' + str(mds[-1]) + '\t' + mds[2] + '\t' + mds[3] + '\t' + mds[4] + '\t' + mds[5] + '\n')
+		
+	MIC_file.close()
 	
 # Close all files
 LogFile.close()
