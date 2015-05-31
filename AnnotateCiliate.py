@@ -4,10 +4,7 @@ import os.path
 import re
 import errno
 import datetime
-import subprocess
-import sys
 from io import StringIO
-from subprocess import call
 from pyfasta import Fasta
 from operator import itemgetter
 from functools import reduce
@@ -183,55 +180,14 @@ for contig in mac_fasta:
 	maskTel_file.close()
 	
 	# Run Rough BLAST pass
-	dust = "yes" if Options['RoughBlastDust'] else "no"
-	ungapped = " -ungapped " if Options['RoughBlastUngapped'] else ""
-	maskLowercase = " -lcase_masking " if Options['BlastMaskLowercase'] else ""
-
-	rough_out = subprocess.check_output("blastn -task " + Options['RoughBlastTask'] + " -word_size " + str(Options['RoughBlastWordSize']) + " -max_hsps 0 " +
-	"-max_target_seqs 10000 -dust " + dust + ungapped + maskLowercase + "-query " + Output_dir + "/hsp/rough/masked_" + str(contig) + ".fa -db " +
-	Output_dir + "/blast/mic -num_threads " + str(Options['ThreadCount']) + 
-	" -outfmt \"10 qseqid sseqid pident length mismatch qstart qend sstart send evalue bitscore qcovs\"")
-	
-	# Filter empty rows
-	roughVal = [x.rstrip() for x in rough_out.decode(sys.stdout.encoding).split('\n') if x != ""]
-		
-	# Save rough results to file
-	rough_file = open(Output_dir + '/hsp/rough/' + str(contig) + '.csv', 'w')
-	for x in roughVal[:-1]:
-		rough_file.write(x + '\n')
-	rough_file.write(roughVal[-1])	
-	rough_file.close()
-	
-	# Run Fine BLAST pass
-	dust = "yes" if Options['FineBlastDust'] else "no"
-	ungapped = " -ungapped " if Options['FineBlastUngapped'] else ""
-
-	fine_out = subprocess.check_output("blastn -task " + Options['FineBlastTask'] + " -word_size " + str(Options['FineBlastWordSize']) + " -max_hsps 0 " + 
-	"-max_target_seqs 10000 -dust " + dust + ungapped + maskLowercase + "-query " + Output_dir + "/hsp/rough/masked_" + str(contig) + ".fa " +
-	"-db " + Output_dir + "/blast/mic " +
-	"-outfmt \"10 qseqid sseqid pident length mismatch qstart qend sstart send evalue bitscore qcovs\"" + " -num_threads " + str(Options['ThreadCount']))
-	
-	# Filter empty rows
-	fineVal = [x.rstrip() for x in fine_out.decode(sys.stdout.encoding).split('\n') if x != ""]
-	
-	# Save fine results to file
-	fine_file = open(Output_dir + '/hsp/fine/' + str(contig) + '.csv', 'w')
-	for x in fineVal[:-1]:
-		fine_file.write(x + "\n")
-	fine_file.write(fineVal[-1])
-	fine_file.close()
-	
-	# Combine result of rough and fine blast and remove duplicates
-	res = [x.split(',') for x in list(set(roughVal).union(set(fineVal)))]
+	roughBLAST = run_Rough_BLAST(Output_dir, str(contig))
 		
 	# Split list according to MIC contigs and sort every splitted entry by the hsp start position in the MAC
 	MIC_maps = list()
-	for mic in {x[1] for x in res}:
-		temp = sorted([hsp for hsp in res if hsp[1] == mic], key=lambda x: int(x[5]))
+	for mic in {x[1] for x in roughBLAST}:
+		temp = sorted([hsp for hsp in roughBLAST if hsp[1] == mic], key=lambda x: int(x[5]))
 		MIC_maps.append(temp)
-	for mic in MIC_maps:
-		mic.sort(key=lambda x: float(x[11]), reverse=True)
-		
+			
 	# Get MAC start and MAC end with respect to telomeres
 	MAC_start = 0
 	MAC_end = len(mac_fasta[contig])
@@ -247,13 +203,22 @@ for contig in mac_fasta:
 	#print(contig, " start: ", MAC_start, " end: ", MAC_end)
 	
 	# Build list of MDSs
-	#print("Calling getMDS_List function\n")
-	MDS_List = getMDS_List(MIC_maps)	
+	MDS_List = get_Rough_MDS_List(MIC_maps)	
 	
-	#for mic in MIC_maps:
-	#	for hsp in mic:
-	#		print(hsp)
-	#print("\n\n")
+	# Check if MAC is fully covered, and run fine pass if it is needed
+	MAC_Coverage = getCovering_Intervals(MDS_List)
+	if len(MAC_Coverage) > 1 or MAC_Coverage[0][0] - MAC_start > 0 or MAC_end - MAC_Coverage[-1][1] > 0:
+		# Run fine BLAST pass
+		fineBLAST = run_Fine_BLAST(Output_dir, str(contig))
+		
+		# Improve current annotation with fine BLAST results
+		improveAnnotation(fineBLAST, MDS_List, MAC_Coverage, MAC_start, MAC_end)
+		
+		# Add fine BLAST hsp into MIC_maps list
+		for hsp in fineBLAST:
+			mic = [x for x in MIC_maps if x[0][1] == hsp[1]]
+			mic[0].append(hsp)
+			
 	# Check for gaps and add them to the MDS List
 	addGaps(MDS_List, MAC_start, MAC_end)	
 		
