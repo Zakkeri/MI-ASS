@@ -182,12 +182,15 @@ for contig in mac_fasta:
 	# Run Rough BLAST pass
 	roughBLAST = run_Rough_BLAST(Output_dir, str(contig))
 		
-	# Split list according to MIC contigs and sort every splitted entry by the hsp start position in the MAC
+	""""# Split list according to MIC contigs and sort every splitted entry by the hsp start position in the MAC
 	MIC_maps = list()
 	for mic in {x[1] for x in roughBLAST}:
 		temp = sorted([hsp for hsp in roughBLAST if hsp[1] == mic], key=lambda x: int(x[5]))
 		MIC_maps.append(temp)
-			
+	"""
+	# Sort rough BLAST output by 1) Coverage and 2) by the hsp start position in the MAC
+	MIC_maps = sorted(roughBLAST, key=lambda x: (float(x[11]), -int(x[5])), reverse=True)
+	
 	# Get MAC start and MAC end with respect to telomeres
 	MAC_start = 0
 	MAC_end = len(mac_fasta[contig])
@@ -216,8 +219,8 @@ for contig in mac_fasta:
 		
 		# Add fine BLAST hsp into MIC_maps list
 		for hsp in fineBLAST:
-			mic = [x for x in MIC_maps if x[0][1] == hsp[1]]
-			mic[0].append(hsp)
+			if hsp not in MIC_maps:
+				MIC_maps.append(hsp)
 			
 	# Check for gaps and add them to the MDS List
 	addGaps(MDS_List, MAC_start, MAC_end)	
@@ -236,23 +239,22 @@ for contig in mac_fasta:
 	MDS_file.close()
 	
 	# Annotate MIC with current MDS list
-	for mic in MIC_maps:
-		for hsp in mic:
-			# Set hsp to no MDS for now
-			hsp.append(-1)
+	for hsp in MIC_maps:
+		# Set hsp to no MDS for now
+		hsp.append(-1)
 			
-			# Get list of MDSs that were mapped from current hsp
-			overlap = [x for x in MDS_List if ((int(hsp[5]) <= x[0] and int(hsp[6]) > x[0]) or (int(hsp[5]) < x[1] and int(hsp[6]) >= x[1])) and (x[2] != 0)]
-			if not overlap:
-				continue
+		# Get list of MDSs that were mapped from current hsp
+		overlap = [x for x in MDS_List if ((int(hsp[5]) <= x[0] and int(hsp[6]) > x[0]) or (int(hsp[5]) < x[1] and int(hsp[6]) >= x[1])) and (x[2] != 0)]
+		if not overlap:
+			continue
 			
-			# Define reduce function to decide what MDS the hsp is going to match the best
-			match = lambda a, b: a if (min(a[1], int(hsp[6])) - (max(a[0], int(hsp[5])))) > (min(b[1], int(hsp[6])) - (max(b[0], int(hsp[5])))) else b
-			matched_MDS = reduce(match, overlap)
+		# Define reduce function to decide what MDS the hsp is going to match the best
+		match = lambda a, b: a if (min(a[1], int(hsp[6])) - (max(a[0], int(hsp[5])))) > (min(b[1], int(hsp[6])) - (max(b[0], int(hsp[5])))) else b
+		matched_MDS = reduce(match, overlap)
 			
-			# check if the percentage of the overlap is above the threshold and label hsp if it does
-			if (min(matched_MDS[1], int(hsp[6])) - max(matched_MDS[0], int(hsp[5])))/(matched_MDS[1] - matched_MDS[0]) >= Options['MIC_Annotation_MDS_Overlap_Threshold']:
-				hsp[-1] = matched_MDS[-1]
+		# check if the percentage of the overlap is above the threshold and label hsp if it does
+		if (min(matched_MDS[1], int(hsp[6])) - max(matched_MDS[0], int(hsp[5])))/(matched_MDS[1] - matched_MDS[0]) >= Options['MIC_Annotation_MDS_Overlap_Threshold']:
+			hsp[-1] = matched_MDS[-1]
 	
 	#print("Annotated MIC\n")
 	#for mic in MIC_maps:
@@ -261,19 +263,19 @@ for contig in mac_fasta:
 	#print("\n\n")
 	# Prepare and Output MIC annotation results
 	MIC = list()
-	for mic in MIC_maps:
-		MIC.append(list())
-		for hsp in mic:
-			entry = [hsp[1], str(contig), hsp[5], hsp[6], hsp[7], hsp[8], hsp[-1]]
-			if(hsp[-1]) != -1 and entry not in MIC[-1]:
-				MIC[-1].append(entry)
-		MIC[-1].sort(key=lambda x: int(x[4]))
+	for hsp in MIC_maps:
+		entry = [hsp[1], str(contig), hsp[5], hsp[6], hsp[7], hsp[8], hsp[-1]]
+		if(hsp[-1]) != -1 and entry not in MIC:
+			MIC.append(entry)
+	MIC.sort(key=lambda x: (x[0], int(x[4])))
 	
 	MIC_file = open(Output_dir + '/MIC_Annotation/' + str(contig) + '.tsv', 'w')
-	for mic in MIC:
-		MIC_file.write(mic[0][0] + '\tMDS\tMAC start\tMAC end\tMIC start\tMIC end\n')
-		for mds in mic:
-			MIC_file.write('\t' + str(mds[-1]) + '\t' + mds[2] + '\t' + mds[3] + '\t' + mds[4] + '\t' + mds[5] + '\n')
+	prevMIC = ""
+	for hsp in MIC:
+		if hsp[0] != prevMIC:
+			MIC_file.write(hsp[0] + '\tMDS\tMAC start\tMAC end\tMIC start\tMIC end\n')
+			prevMIC = hsp[0]
+		MIC_file.write('\t' + str(hsp[-1]) + '\t' + hsp[2] + '\t' + hsp[3] + '\t' + hsp[4] + '\t' + hsp[5] + '\n')
 		
 	MIC_file.close()
 	
