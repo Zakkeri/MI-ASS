@@ -17,17 +17,17 @@ DEBUGGING = True
 # Define argument parser
 parser = argparse.ArgumentParser()
 parser.add_argument('-mic', '--mic', dest='MIC')
-parser.add_argument('-re', '--re', dest='RE')
+#parser.add_argument('-re', '--re', dest='RE')
 parser.add_argument('-mac', '--mac', dest='MAC')
 parser.add_argument('-o', '--o', dest='OUT')
 
 # Get arguments
 if DEBUGGING:
-	args = parser.parse_args('-re AAAACCCC -mic Test_Files/mic.fasta -mac Test_Files/mac.fasta -o ../Output'.split())
+	args = parser.parse_args('-mic Test_Files/mic.fasta -mac Test_Files/mac.fasta -o ../Output'.split())
 else:
 	args = parser.parse_args()
 	
-regExp = args.RE
+regExp = Options['Tel_Reg_Exp']
 MICfile = args.MIC
 MACfile = args.MAC
 Output_dir = args.OUT
@@ -182,14 +182,8 @@ for contig in mac_fasta:
 	# Run Rough BLAST pass
 	roughBLAST = run_Rough_BLAST(Output_dir, str(contig))
 		
-	""""# Split list according to MIC contigs and sort every splitted entry by the hsp start position in the MAC
-	MIC_maps = list()
-	for mic in {x[1] for x in roughBLAST}:
-		temp = sorted([hsp for hsp in roughBLAST if hsp[1] == mic], key=lambda x: int(x[5]))
-		MIC_maps.append(temp)
-	"""
-	# Sort rough BLAST output by 1) Coverage and 2) by the hsp start position in the MAC
-	MIC_maps = sorted(roughBLAST, key=lambda x: (float(x[11]), -int(x[5])), reverse=True)
+	# Sort rough BLAST output by 1) Coverage, 2) MIC contig, 3) by the hsp start position in the MAC
+	MIC_maps = sorted(roughBLAST, key=lambda x: (float(x[11]), x[1], -int(x[5])), reverse=True)
 	
 	# Get MAC start and MAC end with respect to telomeres
 	MAC_start = 0
@@ -256,11 +250,6 @@ for contig in mac_fasta:
 		if (min(matched_MDS[1], int(hsp[6])) - max(matched_MDS[0], int(hsp[5])))/(matched_MDS[1] - matched_MDS[0]) >= Options['MIC_Annotation_MDS_Overlap_Threshold']:
 			hsp[-1] = matched_MDS[-1]
 	
-	#print("Annotated MIC\n")
-	#for mic in MIC_maps:
-	#	for hsp in mic:
-	#		print(hsp)
-	#print("\n\n")
 	# Prepare and Output MIC annotation results
 	MIC = list()
 	for hsp in MIC_maps:

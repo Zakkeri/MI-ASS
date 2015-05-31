@@ -125,41 +125,48 @@ def get_Rough_MDS_List(MIC_maps):
 
 # This function takes fine BLAST result and current MDS list and tries to fill the gaps and improve annotation
 
-def improveAnnotation(MIC_maps, MDS_List, MAC_Coverage, MAC_start, MAC_end):
-	# Sort MIC maps by coverage
-	#MIC_maps.sort(key=lambda x: float(x[0][11]), reverse=True)
-	
-	# Build a list of gaps
-	gaps = list()
-	if MAC_Coverage[0][0] - MAC_start > 0:
-		gaps.append([MAC_start, MAC_Coverage[0][0]])
-	prev = MAC_Coverage[0]
-	for interval in MAC_Coverage[1:]:
-		gaps.append([prev[1], interval[0]])
-		prev = interval
-	if MAC_end - MAC_Coverage[-1][1] > 0:
-		gaps.append([MAC_Coverage[-1][1], MAC_end])
-	
-	# Go through each gap and try to fill it with the hsp from fine BLAST output
-	for gap in gaps:
-		# Construct list of hsps that overlap with the gap
-		gap_overlaps = [x for x in MIC_maps if gap[0] < int(x[6]) and gap[1] > int(x[5])]
-		if not gap_overlaps:
-			continue
+def improveAnnotation(Fine_BLAST, MDS_List, MAC_Coverage, MAC_start, MAC_end):
+	# Improve annotation iteratively by trying to fill the gaps untill no gaps, or no changes
+	is_Change = True
+	while is_Change:
+		is_Change = False
 		
-		# Sort hsps by 1)covers most of the gap, 2) has higher coverage, 3) has lower bitscore
-		reduce_func = lambda a: (min(int(a[6]), gap[1]) - max(int(a[5]), gap[0]),  float(a[11]), -float(a[10]))
-		gap_overlaps.sort(key = reduce_func, reverse=True)
+		# Build a list of gaps
+		gaps = list()
+		if MAC_Coverage[0][0] - MAC_start > 0:
+			gaps.append([MAC_start, MAC_Coverage[0][0]])
+		prev = MAC_Coverage[0]
+		for interval in MAC_Coverage[1:]:
+			gaps.append([prev[1], interval[0]])
+			prev = interval
+		if MAC_end - MAC_Coverage[-1][1] > 0:
+			gaps.append([MAC_Coverage[-1][1], MAC_end])
 		
-		# Go through the list and get the "best" fitting hsp
-		hsp = gap_overlaps[0]
-		mds_toAdd = [int(hsp[5]), int(hsp[6]),1] 
+		# Go through each gap and try to fill it with the hsp from fine BLAST output
+		for gap in gaps:
+			# Construct list of hsps that overlap with the gap
+			gap_overlaps = [x for x in Fine_BLAST if gap[0] < int(x[6]) and gap[1] > int(x[5])]
+			if not gap_overlaps:
+				continue
 		
-		# Add matched hsp to the list of MDSs
-		MDS_List.append(mds_toAdd)
+			# Sort hsps by 1)covers most of the gap, 2) has higher coverage, 3) has lower bitscore
+			reduce_func = lambda a: (min(int(a[6]), gap[1]) - max(int(a[5]), gap[0]),  float(a[11]), -float(a[10]))
+			gap_overlaps.sort(key = reduce_func, reverse=True)
 		
-	# Sort the MDS List
-	MDS_List.sort(key=lambda x: x[0])
+			# Go through the list and get the "best" fitting hsp
+			hsp = gap_overlaps[0]
+			mds_toAdd = [int(hsp[5]), int(hsp[6]),1] 
+			# Add matched hsp to the list of MDSs
+			MDS_List.append(mds_toAdd)
+			is_Change = True
+		
+		# Sort the MDS List
+		MDS_List.sort(key=lambda x: x[0])
+		
+		# Recalculate MAC_Coverage and check if we are done
+		MAC_Coverage = getCovering_Intervals(MDS_List)
+		if len(MAC_Coverage) == 1 and MAC_Coverage[0][0] - MAC_start <= 0 and MAC_end - MAC_Coverage[-1][1] <= 0:
+			break
 #------------------------------------------------------------------------------------------------------------------------------------------------------------------
 # This function takes a list of MDSs (sorted by the MDS begining coordinate) and returns the intervals of the MAC covering
 
