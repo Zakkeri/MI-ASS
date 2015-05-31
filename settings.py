@@ -20,5 +20,6 @@ Options = {
 'FineBlastUngapped' : True,
 'ThreadCount' : 2*multiprocessing.cpu_count(),
 'DatabaseUpdate' : True,
-'MIC_Annotation_MDS_Overlap_Threshold' : .65
+'MIC_Annotation_MDS_Overlap_Threshold' : .65,
+'Tel_Reg_Exp' : "AAAACCCC"
 }
