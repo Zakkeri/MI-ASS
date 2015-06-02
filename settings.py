@@ -11,7 +11,7 @@ Options = {
 'BlastMaskLowercase' : True,
 'RoughBlastTask' : 'megablast',
 'RoughBlastWordSize' : 28,
-'RoughBlastDust' : True,
+'RoughBlastDust' : False,
 'RoughBlastUngapped' : True,
 'RoughCoverageLimit' : 5,
 'FineBlastTask' : 'blastn-short',
@@ -22,4 +22,5 @@ Options = {
 'DatabaseUpdate' : True,
 'MIC_Annotation_MDS_Overlap_Threshold' : .65,
 'Tel_Reg_Exp' : "AAAACCCC"
+#'Tel_Reg_Exp' : "(A{1,4}(A{4}C{4})*A{1,4})|(A{1,4}(A{4}C{4})*C{1,4})|(C{1,4}(A{4}C{4})*A{1,4})|(C{1,4}(A{4}C{4})*C{1,4})|(T{1,4}(T{4}G{4})*T{1,4})|(T{1,4}(T{4}G{4})*G{1,4})|(G{1,4}(T{4}G{4})*T{1,4})|(G{1,4}(T{4}G{4})*G{1,4})"
 }

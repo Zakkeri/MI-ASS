@@ -21,7 +21,10 @@ def run_Rough_BLAST(Output_dir, contig):
 	
 	# Filter empty rows
 	roughVal = [x.rstrip() for x in rough_out.decode(sys.stdout.encoding).split('\n') if x != ""]
-		
+	# Check if there are any hsps
+	if not roughVal:
+		return ""
+	
 	# Save rough results to file
 	rough_file = open(Output_dir + '/hsp/rough/' + contig + '.csv', 'w')
 	for x in roughVal[:-1]:
@@ -50,6 +53,9 @@ def run_Fine_BLAST(Output_dir, contig):
 	
 	# Filter empty rows
 	fineVal = [x.rstrip() for x in fine_out.decode(sys.stdout.encoding).split('\n') if x != ""]
+	# Check if there are any hsps
+	if not fineVal:
+		return ""
 	
 	# Save fine results to file
 	fine_file = open(Output_dir + '/hsp/fine/' + str(contig) + '.csv', 'w')
@@ -189,7 +195,11 @@ def getCovering_Intervals(MDS_List):
 # This function checks whether there are any gaps in the MAC annotation
 
 def addGaps(MDS_List, MAC_start, MAC_end):
-
+	# If MDS List is empty, then return the whole MAC interval as a gap
+	if not MDS_List:
+		MDS_List.append([MAC_start, MAC_end, 0])
+		return
+	
 	# Get the list of covered MAC Interval(s)
 	MAC_Interval = getCovering_Intervals(MDS_List)
 		

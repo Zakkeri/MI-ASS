@@ -4,6 +4,7 @@ import os.path
 import re
 import errno
 import datetime
+import time
 from io import StringIO
 from pyfasta import Fasta
 from operator import itemgetter
@@ -13,6 +14,7 @@ from EssentialFunctions import *
 
 # Debugging
 DEBUGGING = True
+time1 = time.time()
 
 # Define argument parser
 parser = argparse.ArgumentParser()
@@ -182,8 +184,8 @@ for contig in mac_fasta:
 	# Run Rough BLAST pass
 	roughBLAST = run_Rough_BLAST(Output_dir, str(contig))
 		
-	# Sort rough BLAST output by 1) Coverage, 2) MIC contig, 3) by the hsp start position in the MAC
-	MIC_maps = sorted(roughBLAST, key=lambda x: (float(x[11]), x[1], -int(x[5])), reverse=True)
+	# Sort rough BLAST output by 1) Coverage, 2) Length, 3) Persent  identity match, 4) MIC, 5) the hsp start position in the MAC
+	MIC_maps = sorted(roughBLAST, key=lambda x: (float(x[11]), int(x[3]), float(x[2]), x[1], -int(x[5])), reverse=True)
 	
 	# Get MAC start and MAC end with respect to telomeres
 	MAC_start = 0
@@ -204,17 +206,17 @@ for contig in mac_fasta:
 	
 	# Check if MAC is fully covered, and run fine pass if it is needed
 	MAC_Coverage = getCovering_Intervals(MDS_List)
-	if len(MAC_Coverage) > 1 or MAC_Coverage[0][0] - MAC_start > 0 or MAC_end - MAC_Coverage[-1][1] > 0:
+	if not MIC_maps or len(MAC_Coverage) > 1 or MAC_Coverage[0][0] - MAC_start > 0 or MAC_end - MAC_Coverage[-1][1] > 0:
 		# Run fine BLAST pass
 		fineBLAST = run_Fine_BLAST(Output_dir, str(contig))
+		if fineBLAST != "":
+			# Improve current annotation with fine BLAST results
+			improveAnnotation(fineBLAST, MDS_List, MAC_Coverage, MAC_start, MAC_end)
 		
-		# Improve current annotation with fine BLAST results
-		improveAnnotation(fineBLAST, MDS_List, MAC_Coverage, MAC_start, MAC_end)
-		
-		# Add fine BLAST hsp into MIC_maps list
-		for hsp in fineBLAST:
-			if hsp not in MIC_maps:
-				MIC_maps.append(hsp)
+			# Add fine BLAST hsp into MIC_maps list
+			for hsp in fineBLAST:
+				if hsp not in MIC_maps:
+					MIC_maps.append(hsp)
 			
 	# Check for gaps and add them to the MDS List
 	addGaps(MDS_List, MAC_start, MAC_end)	
@@ -271,7 +273,8 @@ for contig in mac_fasta:
 # Close all files
 LogFile.close()
 
-
+#Debugging time spent
+print("Total time spent: ", time.time() - time1, " seconds")
 
 
 
