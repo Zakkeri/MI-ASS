@@ -93,7 +93,7 @@ if DEBUGGING:
 output = None
 try:
 	#call('blastn -version')
-	output = subprocess.check_output("blastn -version")
+	output = subprocess.check_output("blastn -version".split(" "))
 except:
 	print('BLAST is not installed on the computer. Please install BLAST to run the program')
 	logComment('BLAST is not installed on the computer, program terminated')
@@ -105,7 +105,7 @@ logComment("BLAST version: " + output.decode(sys.stdout.encoding).split('\n')[0]
 safeCreateDirectory(Output_dir + '/blast')
 if not os.path.exists(Output_dir + '/blast/mic.nsq'):
 	logComment('Building BLAST database from' + MICfile)
-	output = subprocess.check_output("makeblastdb -in " + str(MICfile) + ' -out ' +  Output_dir + '/blast/mic -dbtype nucl -parse_seqids -hash_index')
+	output = subprocess.check_output(("makeblastdb -in " + str(MICfile) + ' -out ' +  Output_dir + '/blast/mic -dbtype nucl -parse_seqids -hash_index').split(" "))
 	logComment(output.decode(sys.stdout.encoding))
 else:
 	logComment("BLAST database for " + MICfile + " found")
@@ -120,8 +120,8 @@ except Exception as e:
 	logComment("Can't import fasta file\n" + str(e))
 	exit()
 
-if DEBUGGING:
-	print(list(mac_fasta.keys()))
+#if DEBUGGING:
+#	print(list(mac_fasta.keys()))
 
 # Record number of imported MAC contigs
 macCount = len(mac_fasta.keys())
@@ -166,17 +166,56 @@ for contig in mac_fasta:
 	# Run regular expression and mask telomeres
 	seq = str(mac_fasta[contig])
 	telomeres = re_comp.finditer(seq)
-	tell_pos = list()
-	str_pos = 0
-	for iter in telomeres:
-		coord = iter.span()
-		if(str_pos != coord[0]):
-			maskTel_file.write(seq[str_pos:coord[0]].upper())
-		maskTel_file.write(seq[coord[0]:coord[1]].lower())
-		tell_pos.append((coord[0], coord[1]))
-		str_pos = coord[1]
-	if str_pos != len(seq):
-		maskTel_file.write(seq[str_pos:len(seq)].upper())
+	left_Tel = None
+	right_Tel = None
+	
+	# List for storing telomeric sequences that are actually not telomeres
+	tel_seq = list()
+	
+	# If regular expression was identified, then process
+	if telomeres:
+		str_pos = 0
+		tel_positions = [(m.span()[0], m.span()[1]) for m in telomeres]
+		# Check for the telomeres on the left
+		indL = 0
+		for coord in tel_positions:
+			if coord[1] - coord[0] >= 10 and coord[0] <=100:
+				maskTel_file.write(seq[str_pos:coord[0]].upper())
+				maskTel_file.write(seq[coord[0]:coord[1]].lower())
+				left_Tel = (coord[0],coord[1])
+				str_pos = coord[1]
+				indL += 1
+				break
+			if coord[0] > 100:
+				break
+			indL += 1
+					
+		# Check for telomere on the right
+		for i in range(len(tel_positions) - 1, indL-1, -1):
+			coord = tel_positions[i]
+			if coord[1] - coord[0] >=10 and len(mac_fasta[contig]) - coord[1] <= 100:
+				right_Tel = (coord[0], coord[1])
+				break
+			if len(mac_fasta[contig]) - coord[1] > 100:
+				break
+			
+		# Mask telomeric sequence in the middle of contig
+		for coord in tel_positions[indL:]:
+			# If sequence is too short, or it is a right telomere, then skip it
+			if coord[1] - coord[0] < 10 :
+				continue
+			# Otherwise, mask it
+			if(str_pos != coord[0]):
+				maskTel_file.write(seq[str_pos:coord[0]].upper())
+			maskTel_file.write(seq[coord[0]:coord[1]].lower())
+			# If this is not the right telomere, then add it to the telomeric position
+			if not right_Tel or right_Tel[0] != coord[0]:
+				tel_seq.append((coord[0], coord[1]))
+			str_pos = coord[1]
+		
+		# If there are still some letters left to print, print them
+		if str_pos != len(seq):
+			maskTel_file.write(seq[str_pos:len(seq)].upper())
 	
 	# Close masked contig file
 	maskTel_file.close()
@@ -188,16 +227,9 @@ for contig in mac_fasta:
 	MIC_maps = sorted(roughBLAST, key=lambda x: (float(x[11]), int(x[3]), float(x[2]), x[1], -int(x[5])), reverse=True)
 	
 	# Get MAC start and MAC end with respect to telomeres
-	MAC_start = 0
-	MAC_end = len(mac_fasta[contig])
-	if len(tell_pos) >= 2:
-		MAC_start = int(tell_pos[0][1])
-		MAC_end = int(tell_pos[-1][0])
-	elif len(tell_pos) == 1:
-		if int(tell_pos[0][0]) < MAC_end - int(tell_pos[0][1]):
-			MAC_start = int(tell_pos[0][1])
-		else:
-			MAC_end = int(tell_pos[0][0])
+	#print(left_Tel, " ", right_Tel)
+	MAC_start = 0 if not left_Tel else left_Tel[1]
+	MAC_end = len(mac_fasta[contig]) if not right_Tel else right_Tel[0]
 	#Debuging message		
 	#print(contig, " start: ", MAC_start, " end: ", MAC_end)
 	

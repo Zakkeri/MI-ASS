@@ -9,15 +9,28 @@ from settings import *
 
 def run_Rough_BLAST(Output_dir, contig):
 	# Set up parameters
-	dust = "yes" if Options['RoughBlastDust'] else "no"
-	ungapped = " -ungapped " if Options['RoughBlastUngapped'] else ""
-	maskLowercase = " -lcase_masking " if Options['BlastMaskLowercase'] else ""
+	param = ("blastn -task " + Options['RoughBlastTask'] + " -word_size " + str(Options['RoughBlastWordSize']) + " -max_hsps 0 -max_target_seqs 10000 -dust").split(" ")
 	
+	if Options['RoughBlastDust']:
+		param.append("yes")
+	else:
+		param.append("no")
+	if Options['RoughBlastUngapped']:
+		param.append("-ungapped")
+	if Options['BlastMaskLowercase']:
+		param.append("-lcase_masking")
+
+	param.append("-query")
+	param.append(Output_dir + "/hsp/rough/masked_" + str(contig) + ".fa")
+	param.append("-db")
+	param.append(Output_dir + "/blast/mic")
+	param.append("-num_threads")
+	param.append(str(Options['ThreadCount']))
+	param.append("-outfmt")
+	param.append("10 qseqid sseqid pident length mismatch qstart qend sstart send evalue bitscore qcovs")	
+
 	# Run BLAST command
-	rough_out = subprocess.check_output("blastn -task " + Options['RoughBlastTask'] + " -word_size " + str(Options['RoughBlastWordSize']) + " -max_hsps 0 " +
-	"-max_target_seqs 10000 -dust " + dust + ungapped + maskLowercase + "-query " + Output_dir + "/hsp/rough/masked_" + str(contig) + ".fa -db " +
-	Output_dir + "/blast/mic -num_threads " + str(Options['ThreadCount']) + 
-	" -outfmt \"10 qseqid sseqid pident length mismatch qstart qend sstart send evalue bitscore qcovs\"")
+	rough_out = subprocess.check_output(param)
 	
 	# Filter empty rows
 	roughVal = [x.rstrip() for x in rough_out.decode(sys.stdout.encoding).split('\n') if x != ""]
@@ -42,14 +55,27 @@ def run_Rough_BLAST(Output_dir, contig):
 # This function runs fine BLAST and returns hsp result list
 
 def run_Fine_BLAST(Output_dir, contig):
-	dust = "yes" if Options['FineBlastDust'] else "no"
-	ungapped = " -ungapped " if Options['FineBlastUngapped'] else ""
-	maskLowercase = " -lcase_masking " if Options['BlastMaskLowercase'] else ""
+	param = ("blastn -task " + Options['FineBlastTask'] + " -word_size " + str(Options['FineBlastWordSize']) + " -max_hsps 0 -max_target_seqs 10000 -dust").split(" ")
+ 	
+	if Options['FineBlastDust']:
+		param.append("yes")
+	else:
+		param.append("no")
+	if Options['FineBlastUngapped']:
+		param.append("-ungapped")
+	if Options['BlastMaskLowercase']:
+		param.append("-lcase_masking")
 	
-	fine_out = subprocess.check_output("blastn -task " + Options['FineBlastTask'] + " -word_size " + str(Options['FineBlastWordSize']) + " -max_hsps 0 " + 
-	"-max_target_seqs 10000 -dust " + dust + ungapped + maskLowercase + "-query " + Output_dir + "/hsp/rough/masked_" + str(contig) + ".fa " +
-	"-db " + Output_dir + "/blast/mic " +
-	"-outfmt \"10 qseqid sseqid pident length mismatch qstart qend sstart send evalue bitscore qcovs\"" + " -num_threads " + str(Options['ThreadCount']))
+	param.append("-query")
+	param.append(Output_dir + "/hsp/rough/masked_" + str(contig) + ".fa")
+	param.append("-db")
+	param.append(Output_dir + "/blast/mic")
+	param.append("-num_threads")
+	param.append(str(Options['ThreadCount']))
+	param.append("-outfmt")
+	param.append("10 qseqid sseqid pident length mismatch qstart qend sstart send evalue bitscore qcovs")
+
+	fine_out = subprocess.check_output(param)
 	
 	# Filter empty rows
 	fineVal = [x.rstrip() for x in fine_out.decode(sys.stdout.encoding).split('\n') if x != ""]

@@ -21,6 +21,6 @@ Options = {
 'ThreadCount' : 2*multiprocessing.cpu_count(),
 'DatabaseUpdate' : True,
 'MIC_Annotation_MDS_Overlap_Threshold' : .65,
-'Tel_Reg_Exp' : "AAAACCCC"
-#'Tel_Reg_Exp' : "(A{1,4}(A{4}C{4})*A{1,4})|(A{1,4}(A{4}C{4})*C{1,4})|(C{1,4}(A{4}C{4})*A{1,4})|(C{1,4}(A{4}C{4})*C{1,4})|(T{1,4}(T{4}G{4})*T{1,4})|(T{1,4}(T{4}G{4})*G{1,4})|(G{1,4}(T{4}G{4})*T{1,4})|(G{1,4}(T{4}G{4})*G{1,4})"
+#'Tel_Reg_Exp' : "AAAACCCCAAAACCCC"
+'Tel_Reg_Exp' : "(A{1,4}(C{4}A{4})*C{1,4})|(C{1,4}(A{4}C{4})*A{1,4})|(T{1,4}(G{4}T{4})*G{1,4})|(G{1,4}(T{4}G{4})*T{1,4})"
 }
