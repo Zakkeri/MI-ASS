@@ -2,7 +2,7 @@
 import subprocess
 import sys
 from settings import *
-
+from functools import reduce
 #------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 # This function runs rough BLAST and returns the hsp result list
@@ -101,12 +101,8 @@ def run_Fine_BLAST(Output_dir, contig):
 
 def get_Rough_MDS_List(MIC_maps):
 	MDS_List = list()
-	
-	#print('Before sorting: ', MIC_maps)
-	# Sort MIC maps by coverage
-	#MIC_maps.sort(key=lambda x: float(x[0][11]), reverse=True)
-	#print('After sorting: ',MIC_maps)
 	#print('Working with ', str(MIC_maps[0][0]), '\n')
+	
 	# Build list of MDSs
 	for hsp in MIC_maps:
 		mds_toAdd = [int(hsp[5]), int(hsp[6]),1]
@@ -158,21 +154,30 @@ def get_Rough_MDS_List(MIC_maps):
 # This function takes fine BLAST result and current MDS list and tries to fill the gaps and improve annotation
 
 def improveAnnotation(Fine_BLAST, MDS_List, MAC_Coverage, MAC_start, MAC_end):
+	if not 	Fine_BLAST:
+		return
 	# Improve annotation iteratively by trying to fill the gaps untill no gaps, or no changes
+	loopCounter = 1000
 	is_Change = True
-	while is_Change:
+	while is_Change and loopCounter > 0:
 		is_Change = False
-		
+		loopCounter -= 1
+
 		# Build a list of gaps
 		gaps = list()
-		if MAC_Coverage[0][0] - MAC_start > 0:
-			gaps.append([MAC_start, MAC_Coverage[0][0]])
-		prev = MAC_Coverage[0]
-		for interval in MAC_Coverage[1:]:
-			gaps.append([prev[1], interval[0]])
-			prev = interval
-		if MAC_end - MAC_Coverage[-1][1] > 0:
-			gaps.append([MAC_Coverage[-1][1], MAC_end])
+		
+		# If nothing was covered previously, then whole contig is a gap
+		if not MAC_Coverage:
+			gaps.append([MAC_start, MAC_end])
+		else:
+			if MAC_Coverage[0][0] - MAC_start > 1:
+				gaps.append([MAC_start, MAC_Coverage[0][0]])
+			prev = MAC_Coverage[0]
+			for interval in MAC_Coverage[1:]:
+				gaps.append([prev[1], interval[0]])
+				prev = interval
+			if MAC_end - MAC_Coverage[-1][1] > 1:
+				gaps.append([MAC_Coverage[-1][1], MAC_end])
 		
 		# Go through each gap and try to fill it with the hsp from fine BLAST output
 		for gap in gaps:
@@ -199,6 +204,9 @@ def improveAnnotation(Fine_BLAST, MDS_List, MAC_Coverage, MAC_start, MAC_end):
 		MAC_Coverage = getCovering_Intervals(MDS_List)
 		if len(MAC_Coverage) == 1 and MAC_Coverage[0][0] - MAC_start <= 0 and MAC_end - MAC_Coverage[-1][1] <= 0:
 			break
+			
+	if loopCounter <= 0:
+		print("Improving Annotation stopped due to loop counter reaching 0")
 #------------------------------------------------------------------------------------------------------------------------------------------------------------------
 # This function takes a list of MDSs (sorted by the MDS begining coordinate) and returns the intervals of the MAC covering
 
@@ -209,7 +217,7 @@ def getCovering_Intervals(MDS_List):
 		if not MAC_Interval:
 			MAC_Interval.append([mds[0], mds[1]])
 		else:
-			if MAC_Interval[-1][1] >= mds[0]:
+			if MAC_Interval[-1][1] >= mds[0] - 1:
 				MAC_Interval[-1][1] = max(mds[1], MAC_Interval[-1][1])
 			else:
 				MAC_Interval.append([mds[0], mds[1]])
@@ -237,8 +245,29 @@ def addGaps(MDS_List, MAC_start, MAC_end):
 			prev = interv
 			
 	# Check for gaps at the begining of MAC and at the end of MAC
-	if MAC_Interval[0][0] - MAC_start > 0:
+	if MAC_Interval[0][0] - MAC_start > 1:
 		MDS_List.append([MAC_start, MAC_Interval[0][0], 0])
-	if MAC_end - MAC_Interval[-1][1] > 0:
+	if MAC_end - MAC_Interval[-1][1] > 1:
 		MDS_List.append([MAC_Interval[0][1], MAC_end, 0])
 #------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+# This function assigns MDS number to hsps that correspond to some MDS in MAC
+
+def mapHSP_to_MDS(MIC_maps, MDS_List):
+	# Go through the list of hsps and assign MDS number, or -1 to each hsp
+	for hsp in MIC_maps:
+		# Set hsp to no MDS for now
+		hsp.append(-1)
+			
+		# Get list of MDSs that were mapped from current hsp
+		overlap = [x for x in MDS_List if ((int(hsp[5]) <= x[0] and int(hsp[6]) > x[0]) or (int(hsp[5]) < x[1] and int(hsp[6]) >= x[1])) and (x[2] != 0)]
+		if not overlap:
+			continue
+			
+		# Define reduce function to decide what MDS the hsp is going to match the best
+		match = lambda a, b: a if (min(a[1], int(hsp[6])) - (max(a[0], int(hsp[5])))) > (min(b[1], int(hsp[6])) - (max(b[0], int(hsp[5])))) else b
+		matched_MDS = reduce(match, overlap)
+			
+		# check if the percentage of the overlap is above the threshold and label hsp if it does
+		if (min(matched_MDS[1], int(hsp[6])) - max(matched_MDS[0], int(hsp[5])))/(matched_MDS[1] - matched_MDS[0]) >= Options['MIC_Annotation_MDS_Overlap_Threshold']:
+			hsp[-1] = matched_MDS[-1]
