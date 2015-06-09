@@ -269,5 +269,6 @@ def mapHSP_to_MDS(MIC_maps, MDS_List):
 		matched_MDS = reduce(match, overlap)
 			
 		# check if the percentage of the overlap is above the threshold and label hsp if it does
-		if (min(matched_MDS[1], int(hsp[6])) - max(matched_MDS[0], int(hsp[5])))/(matched_MDS[1] - matched_MDS[0]) >= Options['MIC_Annotation_MDS_Overlap_Threshold']:
-			hsp[-1] = matched_MDS[-1]
+		#if (min(matched_MDS[1], int(hsp[6])) - max(matched_MDS[0], int(hsp[5])))/(matched_MDS[1] - matched_MDS[0]) >= Options['MIC_Annotation_MDS_Overlap_Threshold']:
+		# Assign hsp to MDS
+		hsp[-1] = matched_MDS[-1]

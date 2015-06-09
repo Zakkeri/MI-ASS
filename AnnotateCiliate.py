@@ -24,7 +24,8 @@ parser.add_argument('-o', '--o', dest='OUT')
 
 # Get arguments
 if DEBUGGING:
-	args = parser.parse_args('-mic Test_Files/mic.fasta -mac Test_Files/mac.fasta -o ../Output'.split())
+	#args = parser.parse_args('-mic Test_Files/mic.fasta -mac Test_Files/mac.fasta -o ../Output'.split())
+	args = parser.parse_args('-mic ../Assembly_Data/oxy_tri_-_mic_assembly.fasta -mac ../Assembly_Data/Test_File.fasta -o ../Output'.split())
 	#args = parser.parse_args('-mic ./oxy_tri_-_mic_assembly.fasta -mac ./oxy_tri_-_mac_assembly_(with_pacbio).fasta -o ./Output'.split())
 else:
 	args = parser.parse_args()
@@ -72,6 +73,7 @@ except OSError as exception:
 def logComment(comment):
 	global LogFile
 	LogFile.write(datetime.datetime.now().strftime("%I:%M%p %B %d %Y") + ' - ' + comment + '\n')
+	LogFile.flush()
 #-----------------------------------------------------------------------------------------------------
 
 #-----------------------------------------------------------------------------------------------------
@@ -272,11 +274,11 @@ for contig in sorted(mac_fasta):
 	# Annotate hsp with current MDS list
 	mapHSP_to_MDS(MIC_maps, MDS_List)
 	
-	# Prepare and Output MIC annotation results
+	# Prepare and Output MIC annotation results (Remove duplicates)
 	MIC = list()
 	for hsp in MIC_maps:
 		entry = [hsp[1], str(contig), hsp[5], hsp[6], hsp[7], hsp[8], hsp[-1]]
-		if(hsp[-1]) != -1 and entry not in MIC:
+		if entry not in MIC:
 			MIC.append(entry)
 	MIC.sort(key=lambda x: (x[0], int(x[4])))
 	
@@ -290,6 +292,7 @@ for contig in sorted(mac_fasta):
 		
 	MIC_file.close()
 	
+logComment("Annotation is finished! Total time spent: " + str(time.time() - time1) + " seconds")
 # Close all files
 LogFile.close()
 
