@@ -112,7 +112,7 @@ def get_Rough_MDS_List(MIC_maps):
 			continue
 			
 		# Get list of hsp that overlap with hsp that we are trying to add
-		overlap = [x for x in MDS_List if (x[0] > mds_toAdd[0] and x[0] < mds_toAdd[1]) or (x[1] > mds_toAdd[0] and x[1] < mds_toAdd[1])]
+		overlap = [x for x in MDS_List if x[1] > mds_toAdd[0] and x[0] < mds_toAdd[1]]
 		toAdd = False
 		
 		# If overlap is empty, then add MDS
@@ -123,7 +123,7 @@ def get_Rough_MDS_List(MIC_maps):
 		else:
 			for x in sorted(overlap, key=lambda x: x[0]):
 				# Check if two MDSs can be merged
-				if (mds_toAdd[0] + mds_toAdd[1])/2 in range(x[0], x[1]):
+				if (mds_toAdd[0] + mds_toAdd[1])/2 in range(x[0], x[1]) or (x[0] + x[1])/2 in range(mds_toAdd[0], mds_toAdd[1]):
 					#print("Can merge two MDSs")
 					mds_toAdd[0] = min(mds_toAdd[0], x[0])
 					mds_toAdd[1] = max(mds_toAdd[1], x[1])
@@ -134,20 +134,20 @@ def get_Rough_MDS_List(MIC_maps):
 				# Overlap is on the left
 				elif mds_toAdd[0] < x[0]:
 					#print("Overlap on the left")
-					sub_overlap = [y for y in MDS_List if (y[1] > mds_toAdd[0]) and (y[1] < x[1])]
+					sub_overlap = [y for y in MDS_List if y[1] > mds_toAdd[0] and y[1] <= x[0]]
 					if not sub_overlap:
 						toAdd = True
 				# Overlap is on the right
 				else:
 					#print("Overlap on the right")
-					sub_overlap = [y for y in MDS_List if (y[0] > x[0] and y[0] < mds_toAdd[1])]
+					sub_overlap = [y for y in MDS_List if y[0] < mds_toAdd[1] and y[0] >= x[1]]
 					if not sub_overlap:
 						toAdd = True
 						
 		if toAdd:
 			#print("Adding: ", mds_toAdd)
 			MDS_List.append(mds_toAdd)
-	
+			
 	return MDS_List
 #------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -193,6 +193,14 @@ def improveAnnotation(Fine_BLAST, MDS_List, MAC_Coverage, MAC_start, MAC_end):
 			# Go through the list and get the "best" fitting hsp
 			hsp = gap_overlaps[0]
 			mds_toAdd = [int(hsp[5]), int(hsp[6]),1] 
+			
+			# Check if there are any MDSs that are subsets of this hsp
+			sub_MDSs = [x for x in MDS_List if mds_toAdd[0] <= x[0] and mds_toAdd[1] >= x[1]]
+			
+			# Remove those MDSs
+			for mds in sub_MDSs:
+				MDS_List.remove(mds)
+			
 			# Add matched hsp to the list of MDSs
 			MDS_List.append(mds_toAdd)
 			is_Change = True
@@ -248,7 +256,7 @@ def addGaps(MDS_List, MAC_start, MAC_end):
 	if MAC_Interval[0][0] - MAC_start > 1:
 		MDS_List.append([MAC_start, MAC_Interval[0][0], 0])
 	if MAC_end - MAC_Interval[-1][1] > 1:
-		MDS_List.append([MAC_Interval[0][1], MAC_end, 0])
+		MDS_List.append([MAC_Interval[-1][1], MAC_end, 0])
 #------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 # This function assigns MDS number to hsps that correspond to some MDS in MAC
