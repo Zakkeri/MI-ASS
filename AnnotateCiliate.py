@@ -239,16 +239,15 @@ for contig in sorted(mac_fasta):
 	#print(contig, " start: ", MAC_start, " end: ", MAC_end)
 	
 	# Build list of MDSs
-	MDS_List = get_Rough_MDS_List(MIC_maps)	
+	MDS_List = get_Rough_MDS_List(MIC_maps, MAC_start, MAC_end)	
 	
 	# Check if MAC is fully covered, and run fine pass if it is needed
-	MAC_Coverage = getCovering_Intervals(MDS_List)
-	if not MIC_maps or len(MAC_Coverage) > 1 or MAC_Coverage[0][0] - MAC_start > 0 or MAC_end - MAC_Coverage[-1][1] > 0:
+	if getGapsList(MDS_List, MAC_start, MAC_end):
 		# Run fine BLAST pass
 		fineBLAST = run_Fine_BLAST(Output_dir, str(contig))
 		if fineBLAST != "":
 			# Improve current annotation with fine BLAST results
-			improveAnnotation(fineBLAST, MDS_List, MAC_Coverage, MAC_start, MAC_end)
+			improveAnnotation(fineBLAST, MDS_List, MAC_start, MAC_end)
 		
 			# Add fine BLAST hsp into MIC_maps list
 			for hsp in fineBLAST:

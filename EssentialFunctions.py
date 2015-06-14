@@ -99,86 +99,56 @@ def run_Fine_BLAST(Output_dir, contig):
 
 # This function goes through the list of high scoring pairs that are associated with the MIC and constructs MDSs for the MAC
 
-def get_Rough_MDS_List(MIC_maps):
+def get_Rough_MDS_List(MIC_maps, MAC_start, MAC_end):
+	# List to return
 	MDS_List = list()
-	#print('Working with ', str(MIC_maps[0][0]), '\n')
-	
+	# Gaps List
+	Gaps = [[MAC_start, MAC_end]]
+		
 	# Build list of MDSs
 	for hsp in MIC_maps:
 		mds_toAdd = [int(hsp[5]), int(hsp[6]),1]
-		#print("Considering: ", mds_toAdd)
-		# Check if it is a subset of some MDS and skip it if it does
-		if [x for x in MDS_List if mds_toAdd[0] >= x[0] and mds_toAdd[1] <= x[1]]:
+				
+		# If current MDS does not overlap with any gap, then skip it
+		if not [x for x in Gaps if x[1] > mds_toAdd[0] and x[0] < mds_toAdd[1]]:
 			continue
-			
-		# Get list of hsp that overlap with hsp that we are trying to add
-		overlap = [x for x in MDS_List if x[1] > mds_toAdd[0] and x[0] < mds_toAdd[1]]
-		toAdd = False
 		
-		# If overlap is empty, then add MDS
-		if not overlap:
-			#print("No overlap, just add")
-			toAdd = True
-		# Go through current MDSs and see if any can be made longer
-		else:
-			for x in sorted(overlap, key=lambda x: x[0]):
-				# Check if two MDSs can be merged
-				if (mds_toAdd[0] + mds_toAdd[1])/2 in range(x[0], x[1]) or (x[0] + x[1])/2 in range(mds_toAdd[0], mds_toAdd[1]):
-					#print("Can merge two MDSs")
-					mds_toAdd[0] = min(mds_toAdd[0], x[0])
-					mds_toAdd[1] = max(mds_toAdd[1], x[1])
-					#print("Removing: ", x)
-					MDS_List.remove(x)
-					toAdd = True
-				# Check if non-overlapping hsp portion overlaps with some other MDS and if it doesn't, then add it
-				# Overlap is on the left
-				elif mds_toAdd[0] < x[0]:
-					#print("Overlap on the left")
-					sub_overlap = [y for y in MDS_List if y[1] > mds_toAdd[0] and y[1] <= x[0]]
-					if not sub_overlap:
-						toAdd = True
-				# Overlap is on the right
-				else:
-					#print("Overlap on the right")
-					sub_overlap = [y for y in MDS_List if y[0] < mds_toAdd[1] and y[0] >= x[1]]
-					if not sub_overlap:
-						toAdd = True
-						
-		if toAdd:
-			#print("Adding: ", mds_toAdd)
-			MDS_List.append(mds_toAdd)
+		# Go through MDSs that overlap with current MDS and see if any can be merged or removed
+		for x in sorted([mds for mds in MDS_List if mds[1] > mds_toAdd[0] and mds[0] < mds_toAdd[1]]):
+			# If x is a subset of mds_toAdd, then remove x
+			if x[0] >= mds_toAdd[0] and x[1] <= mds_toAdd[1]:
+				MDS_List.remove(x)
+			# Check if two MDSs can be merged
+			elif (mds_toAdd[0] + mds_toAdd[1])/2 in range(x[0], x[1]) or (x[0] + x[1])/2 in range(mds_toAdd[0], mds_toAdd[1]):
+				mds_toAdd[0] = min(mds_toAdd[0], x[0])
+				mds_toAdd[1] = max(mds_toAdd[1], x[1])
+				MDS_List.remove(x)
+		
+		# Add MDS to the MDS list, update gaps list, check if we are done
+		MDS_List.append(mds_toAdd)
+		Gaps = getGapsList(MDS_List, MAC_start, MAC_end)
+		if not Gaps:
+			break
 			
 	return MDS_List
 #------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 # This function takes fine BLAST result and current MDS list and tries to fill the gaps and improve annotation
 
-def improveAnnotation(Fine_BLAST, MDS_List, MAC_Coverage, MAC_start, MAC_end):
+def improveAnnotation(Fine_BLAST, MDS_List, MAC_start, MAC_end):
 	if not 	Fine_BLAST:
 		return
 	# Improve annotation iteratively by trying to fill the gaps untill no gaps, or no changes
 	loopCounter = 1000
 	is_Change = True
-	while is_Change and loopCounter > 0:
+	# Build a list of gaps
+	gaps = getGapsList(MDS_List, MAC_start, MAC_end)
+	
+	# Iterate and improve annotation while there are changes, gaps, and loop counter is not zero
+	while is_Change and gaps and loopCounter > 0:
 		is_Change = False
 		loopCounter -= 1
 
-		# Build a list of gaps
-		gaps = list()
-		
-		# If nothing was covered previously, then whole contig is a gap
-		if not MAC_Coverage:
-			gaps.append([MAC_start, MAC_end])
-		else:
-			if MAC_Coverage[0][0] - MAC_start > 1:
-				gaps.append([MAC_start, MAC_Coverage[0][0]])
-			prev = MAC_Coverage[0]
-			for interval in MAC_Coverage[1:]:
-				gaps.append([prev[1], interval[0]])
-				prev = interval
-			if MAC_end - MAC_Coverage[-1][1] > 1:
-				gaps.append([MAC_Coverage[-1][1], MAC_end])
-		
 		# Go through each gap and try to fill it with the hsp from fine BLAST output
 		for gap in gaps:
 			# Construct list of hsps that overlap with the gap
@@ -190,7 +160,7 @@ def improveAnnotation(Fine_BLAST, MDS_List, MAC_Coverage, MAC_start, MAC_end):
 			reduce_func = lambda a: (min(int(a[6]), gap[1]) - max(int(a[5]), gap[0]),  float(a[11]), -float(a[10]))
 			gap_overlaps.sort(key = reduce_func, reverse=True)
 		
-			# Go through the list and get the "best" fitting hsp
+			# Get the "best" fitting hsp
 			hsp = gap_overlaps[0]
 			mds_toAdd = [int(hsp[5]), int(hsp[6]),1] 
 			
@@ -208,11 +178,9 @@ def improveAnnotation(Fine_BLAST, MDS_List, MAC_Coverage, MAC_start, MAC_end):
 		# Sort the MDS List
 		MDS_List.sort(key=lambda x: x[0])
 		
-		# Recalculate MAC_Coverage and check if we are done
-		MAC_Coverage = getCovering_Intervals(MDS_List)
-		if len(MAC_Coverage) == 1 and MAC_Coverage[0][0] - MAC_start <= 0 and MAC_end - MAC_Coverage[-1][1] <= 0:
-			break
-			
+		# Recalculate gaps in the MAC annotation
+		gaps = getGapsList(MDS_List, MAC_start, MAC_end)		
+	
 	if loopCounter <= 0:
 		print("Improving Annotation stopped due to loop counter reaching 0")
 #------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -281,3 +249,33 @@ def mapHSP_to_MDS(MIC_maps, MDS_List):
 		
 		# Assign hsp to MDS
 		hsp[-1] = matched_MDS[-1]
+#------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+# This function calculates the list of gaps in the MAC annotation
+		
+def getGapsList(MDS_List, MAC_start, MAC_end):
+	# If no MDS, return the whole contig interval
+	if not MDS_List:
+		return [MAC_start, MAC_end]
+	
+	# Sort MDS list
+	MDS_List.sort(key=lambda x: x[0])
+	
+	# Add gap at the begining, if needed
+	Gaps = list()
+	if MDS_List[0][0] - MAC_start > 1:
+		Gaps.append([MAC_start, MDS_List[0][0]])
+	
+	# If there are more than one MDS, then add gaps in between MDSs
+	if len(MDS_List) > 1:
+		prev = MDS_List[0]
+		for x in MDS_List[1:]:
+			if x[0] - prev[1] > 1:
+				Gaps.append([prev[1], x[0]])
+			prev = x
+	
+	# Check if there is a gap at the end	
+	if MAC_end - MDS_List[-1][1] > 1:
+		Gaps.append([MDS_List[-1][1], MAC_end])
+		
+	return Gaps
