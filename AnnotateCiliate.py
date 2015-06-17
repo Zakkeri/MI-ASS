@@ -157,6 +157,13 @@ safeCreateDirectory(Output_dir + '/Annotated_MDS')
 # Create output directory for MIC annotation
 safeCreateDirectory(Output_dir + '/MIC_Annotation')	
 
+# Create database input directory and database load files
+safeCreateDirectory(Output_dir + '/Database_Input')	
+temp = open(Output_dir + '/Database_Input/hsp.tsv', 'w')
+temp.close()
+temp = open(Output_dir + '/Database_Input/mds.tsv', 'w')
+temp.close()
+
 # Start BLASTing and annotating
 logComment('Annotating ' + str(macCount) + ' MAC contigs...')
 
@@ -284,6 +291,9 @@ for contig in sorted(mac_fasta):
 		MIC_file.write('\t' + str(hsp[-1]) + '\t' + hsp[5] + '\t' + hsp[6] + '\t' + hsp[7] + '\t' + hsp[8] + '\n')
 		
 	MIC_file.close()
+	
+	# Update database input files
+	updateDatabaseInput(MDS_List, MIC_maps, Output_dir, contig)
 	
 logComment("Annotation is finished! Total time spent: " + str(time.time() - time1) + " seconds")
 # Close all files
