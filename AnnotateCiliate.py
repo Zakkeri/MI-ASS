@@ -249,9 +249,9 @@ for contig in sorted(mac_fasta):
 			# Improve current annotation with fine BLAST results
 			improveAnnotation(fineBLAST, MDS_List, MAC_start, MAC_end)
 		
-			# Add fine BLAST hsp into MIC_maps list
+			# Add fine BLAST hsp into MIC_maps list if fine hsp is not a subset of some rough hsp
 			for hsp in fineBLAST:
-				if hsp not in MIC_maps:
+				if not [x for x in MIC_maps if hsp[1] == x[1] and int(x[5]) <= int(hsp[5]) and int(x[6]) >= int(hsp[6])]:
 					MIC_maps.append(hsp)
 			
 	# Check for gaps and add them to the MDS List
@@ -273,21 +273,15 @@ for contig in sorted(mac_fasta):
 	# Annotate hsp with current MDS list
 	mapHSP_to_MDS(MIC_maps, MDS_List)
 	
-	# Prepare and Output MIC annotation results (Remove duplicates)
-	MIC = list()
-	for hsp in MIC_maps:
-		entry = [hsp[1], str(contig), hsp[5], hsp[6], hsp[7], hsp[8], hsp[-1]]
-		if entry not in MIC:
-			MIC.append(entry)
-	MIC.sort(key=lambda x: (x[0], int(x[4])))
-	
+	# Output MIC annotation
+	MIC_maps.sort(key=lambda x: (x[1], int(x[7])))
 	MIC_file = open(Output_dir + '/MIC_Annotation/' + str(contig) + '.tsv', 'w')
 	prevMIC = ""
-	for hsp in MIC:
-		if hsp[0] != prevMIC:
-			MIC_file.write(hsp[0] + '\tMDS\tMAC start\tMAC end\tMIC start\tMIC end\n')
-			prevMIC = hsp[0]
-		MIC_file.write('\t' + str(hsp[-1]) + '\t' + hsp[2] + '\t' + hsp[3] + '\t' + hsp[4] + '\t' + hsp[5] + '\n')
+	for hsp in MIC_maps:
+		if hsp[1] != prevMIC:
+			MIC_file.write(hsp[1] + '\tMDS\tMAC start\tMAC end\tMIC start\tMIC end\n')
+			prevMIC = hsp[1]
+		MIC_file.write('\t' + str(hsp[-1]) + '\t' + hsp[5] + '\t' + hsp[6] + '\t' + hsp[7] + '\t' + hsp[8] + '\n')
 		
 	MIC_file.close()
 	
