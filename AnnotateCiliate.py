@@ -257,8 +257,19 @@ for contig in sorted(mac_fasta):
 			improveAnnotation(fineBLAST, MDS_List, MAC_start, MAC_end)
 		
 			# Add fine BLAST hsp into MIC_maps list if fine hsp is not a subset of some rough hsp
+			temp_split = list()
+			indexMap = {}
+			ind = 0
+			for hsp in MIC_maps:
+				if hsp[1] in indexMap:
+					temp_split[indexMap[hsp[1]]].append(hsp)
+				else:
+					indexMap[hsp[1]] = ind
+					ind += 1
+					temp_split.append([hsp])
+					
 			for hsp in fineBLAST:
-				if not [x for x in MIC_maps if hsp[1] == x[1] and int(x[5]) <= int(hsp[5]) and int(x[6]) >= int(hsp[6])]:
+				if hsp[1] not in indexMap or not [x for x in temp_split[indexMap[hsp[1]]] if int(x[5]) <= int(hsp[5]) and int(x[6]) >= int(hsp[6])]:
 					MIC_maps.append(hsp)
 			
 	# Check for gaps and add them to the MDS List
