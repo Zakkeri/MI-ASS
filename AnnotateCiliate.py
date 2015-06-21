@@ -233,11 +233,8 @@ for contig in sorted(mac_fasta):
 	maskTel_file.close()
 	
 	# Run Rough BLAST pass
-	roughBLAST = run_Rough_BLAST(Output_dir, str(contig))
+	MIC_maps = run_Rough_BLAST(Output_dir, str(contig))
 		
-	# Sort rough BLAST output by 1) Coverage, 2) Length, 3) Persent  identity match, 4) MIC, 5) the hsp start position in the MAC
-	MIC_maps = sorted(roughBLAST, key=lambda x: (float(x[11]), int(x[3]), float(x[2]), x[1], -int(x[5])), reverse=True)
-	
 	# Get MAC start and MAC end with respect to telomeres
 	#print(left_Tel, " ", right_Tel)
 	MAC_start = 1 if not left_Tel else left_Tel[1]
@@ -245,16 +242,28 @@ for contig in sorted(mac_fasta):
 	#Debuging message		
 	#print(contig, " start: ", MAC_start, " end: ", MAC_end)
 	
-	# Build list of MDSs
-	MDS_List = get_Rough_MDS_List(MIC_maps, MAC_start, MAC_end)	
+	# Build list of MDSs if there is a BLAST output
+	MDS_List = list()
+	if MIC_maps != "":
+		# Sort rough BLAST output by 1) Coverage, 2) Length, 3) Persent  identity match, 4) MIC, 5) the hsp start position in the MAC
+		sort_func = key=lambda x: (float(x[11]), int(x[3]), float(x[2]), x[1], -int(x[5]))
+		MIC_maps.sort(key = sort_func, reverse=True)
+		getMDS_Annotation(MDS_List, MIC_maps, MAC_start, MAC_end)	
+	else:
+		MIC_maps = list()
 	
 	# Check if MAC is fully covered, and run fine pass if it is needed
 	if getGapsList(MDS_List, MAC_start, MAC_end):
 		# Run fine BLAST pass
 		fineBLAST = run_Fine_BLAST(Output_dir, str(contig))
+		
+		# If there is a BLAST output, process it
 		if fineBLAST != "":
+			# Sort hsps by 1) has higher coverage, 2) has higher length 3) has higher pident 4) has lower bitscore
+			sort_func = lambda a: ( float(a[11]), int(a[3]), float(a[2]), -float(a[10]))
+			fineBLAST.sort(key = sort_func, reverse=True)
 			# Improve current annotation with fine BLAST results
-			improveAnnotation(fineBLAST, MDS_List, MAC_start, MAC_end)
+			getMDS_Annotation(MDS_List, fineBLAST, MAC_start, MAC_end)
 		
 			# Add fine BLAST hsp into MIC_maps list if fine hsp is not a subset of some rough hsp
 			temp_split = list()
