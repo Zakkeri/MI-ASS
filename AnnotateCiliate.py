@@ -21,6 +21,7 @@ parser.add_argument('-mic', '--mic', dest='MIC')
 #parser.add_argument('-re', '--re', dest='RE')
 parser.add_argument('-mac', '--mac', dest='MAC')
 parser.add_argument('-o', '--o', dest='OUT')
+parser.add_argument('-reblast', '--rb', dest='RB', action='store_true')
 
 # Get arguments
 if DEBUGGING:
@@ -34,6 +35,7 @@ regExp = Options['Tel_Reg_Exp']
 MICfile = args.MIC
 MACfile = args.MAC
 Output_dir = args.OUT
+ReBlast = args.RB
 
 # Check if files are real files
 while not os.path.isfile(MICfile):
@@ -233,7 +235,7 @@ for contig in sorted(mac_fasta):
 	maskTel_file.close()
 	
 	# Run Rough BLAST pass
-	MIC_maps = run_Rough_BLAST(Output_dir, str(contig))
+	MIC_maps = readBLAST_file(Output_dir + "/hsp/rough/" + str(contig) + ".csv") if not ReBlast and os.path.isfile(Output_dir + "/hsp/rough/" + str(contig) + ".csv") else run_Rough_BLAST(Output_dir, str(contig))
 		
 	# Get MAC start and MAC end with respect to telomeres
 	#print(left_Tel, " ", right_Tel)
@@ -245,9 +247,9 @@ for contig in sorted(mac_fasta):
 	# Build list of MDSs if there is a BLAST output
 	MDS_List = list()
 	if MIC_maps != "":
-		# Sort rough BLAST output by 1) Coverage, 2) Length, 3) Persent  identity match, 4) MIC, 5) the hsp start position in the MAC
-		sort_func = key=lambda x: (float(x[11]), int(x[3]), float(x[2]), x[1], -int(x[5]))
-		MIC_maps.sort(key = sort_func, reverse=True)
+		# Sort rough BLAST output
+		sortHSP_List(MIC_maps)
+		# Annotate MDSs with rough BLAST hsps
 		getMDS_Annotation(MDS_List, MIC_maps, MAC_start, MAC_end)	
 	else:
 		MIC_maps = list()
@@ -255,13 +257,13 @@ for contig in sorted(mac_fasta):
 	# Check if MAC is fully covered, and run fine pass if it is needed
 	if getGapsList(MDS_List, MAC_start, MAC_end):
 		# Run fine BLAST pass
-		fineBLAST = run_Fine_BLAST(Output_dir, str(contig))
+		fineBLAST = readBLAST_file(Output_dir + "/hsp/fine/" + str(contig) + ".csv") if not ReBlast and os.path.isfile(Output_dir + "/hsp/fine/" + str(contig) + ".csv") else run_Fine_BLAST(Output_dir, str(contig))
 		
 		# If there is a BLAST output, process it
 		if fineBLAST != "":
-			# Sort hsps by 1) has higher coverage, 2) has higher length 3) has higher pident 4) has lower bitscore
-			sort_func = lambda a: ( float(a[11]), int(a[3]), float(a[2]), -float(a[10]))
-			fineBLAST.sort(key = sort_func, reverse=True)
+			# Sort fine BLAST output 
+			sortHSP_List(fineBLAST)
+			
 			# Improve current annotation with fine BLAST results
 			getMDS_Annotation(MDS_List, fineBLAST, MAC_start, MAC_end)
 		
