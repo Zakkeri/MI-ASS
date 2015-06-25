@@ -165,6 +165,8 @@ temp = open(Output_dir + '/Database_Input/hsp.tsv', 'w')
 temp.close()
 temp = open(Output_dir + '/Database_Input/mds.tsv', 'w')
 temp.close()
+temp = open(Output_dir + '/Database_Input/tel.tsv', 'w')
+temp.close()
 
 # Start BLASTing and annotating
 logComment('Annotating ' + str(macCount) + ' MAC contigs...')
@@ -193,30 +195,30 @@ for contig in sorted(mac_fasta):
 		# Check for the telomeres on the left
 		indL = 0
 		for coord in tel_positions:
-			if coord[1] - coord[0] >= 10 and coord[0] <=100:
+			if coord[1] - coord[0] >= Options['TelomereLength'] and coord[0] <= Options['TelomereEndLimit']:
 				maskTel_file.write(seq[str_pos:coord[0]].upper())
 				maskTel_file.write(seq[coord[0]:coord[1]].lower())
 				left_Tel = (coord[0],coord[1])
 				str_pos = coord[1]
 				indL += 1
 				break
-			if coord[0] > 100:
+			if coord[0] > Options['TelomereEndLimit']:
 				break
 			indL += 1
 					
 		# Check for telomere on the right
 		for i in range(len(tel_positions) - 1, indL-1, -1):
 			coord = tel_positions[i]
-			if coord[1] - coord[0] >=10 and len(mac_fasta[contig]) - coord[1] <= 100:
+			if coord[1] - coord[0] >= Options['TelomereLength'] and len(mac_fasta[contig]) - coord[1] <= Options['TelomereEndLimit']:
 				right_Tel = (coord[0], coord[1])
 				break
-			if len(mac_fasta[contig]) - coord[1] > 100:
+			if len(mac_fasta[contig]) - coord[1] > Options['TelomereEndLimit']:
 				break
 			
 		# Mask telomeric sequence in the middle of contig
 		for coord in tel_positions[indL:]:
 			# If sequence is too short, or it is a right telomere, then skip it
-			if coord[1] - coord[0] < 10 :
+			if coord[1] - coord[0] < Options['TelomereLength'] :
 				continue
 			# Otherwise, mask it
 			if(str_pos != coord[0]):
@@ -313,9 +315,10 @@ for contig in sorted(mac_fasta):
 		MIC_file.write('\t' + str(hsp[-1]) + '\t' + hsp[5] + '\t' + hsp[6] + '\t' + hsp[7] + '\t' + hsp[8] + '\n')
 		
 	MIC_file.close()
-	
+
 	# Update database input files
-	updateDatabaseInput(MDS_List, MIC_maps, Output_dir, contig)
+	if Options['DatabaseUpdate']:
+		updateDatabaseInput(MDS_List, MIC_maps, left_Tel, right_Tel, MAC_start, MAC_end, Output_dir, contig)
 	
 logComment("Annotation is finished! Total time spent: " + str(time.time() - time1) + " seconds")
 # Close all files

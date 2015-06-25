@@ -248,7 +248,7 @@ def getGapsList(MDS_List, MAC_start, MAC_end):
 
 # This function outputs annotation results into the database load file
 
-def updateDatabaseInput(MDS_List, MIC_maps, Output_dir, contig):
+def updateDatabaseInput(MDS_List, MIC_maps, left_Tel, right_Tel, MAC_start, MAC_end, Output_dir, contig):
 	# If MIC_maps are not empty, then update hsp file
 	if MIC_maps:
 		# Open hsp file to append
@@ -293,11 +293,36 @@ def updateDatabaseInput(MDS_List, MIC_maps, Output_dir, contig):
 		# Close mds file
 		mdsFile.close()
 		
+	# Update telomeres file
+	updateDatabaseInput.telID += 1
+	telFile = open(Output_dir + '/Database_Input/tel.tsv', 'a')
+	
+	# Get number of telomeres
+	tel_num = 0
+	if left_Tel:
+		tel_num += 1
+	if right_Tel:
+		tel_num += 1
+	
+	# Output to file
+	telFile.write(str(updateDatabaseInput.telID) + "\t\\N\t" + str(contig) + "\t" + str(MAC_end - MAC_start + 1) + "\t" + str(tel_num) + "\t")
+	# Info about left telomere
+	if left_Tel:
+		telFile.write(str(left_Tel[0]+1) + "\t" + str(left_Tel[1]+1) + "\t" + str(left_Tel[1] - left_Tel[0] + 1) + "\t")
+	else:
+		telFile.write("NULL\tNULL\t0\t")
+	# infor about right telomere
+	if right_Tel:
+		telFile.write(str(right_Tel[0]+1) + "\t" + str(right_Tel[1]+1) + "\t" + str(right_Tel[1] - right_Tel[0] + 1) + "\n")
+	else:
+		telFile.write("NULL\tNULL\t0\n")	
 		
+	telFile.close()
+	
 # Static variables for updateDatabaseInput function
 updateDatabaseInput.hspID = 0
 updateDatabaseInput.mdsID = 0	
-	
+updateDatabaseInput.telID = 0
 #------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 # This function sorts hsp list
