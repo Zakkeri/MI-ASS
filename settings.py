@@ -7,7 +7,7 @@ Options = {
 'MDS' : True,
 'Pointers' : True, 
 'TelomereEndLimit' : 100,
-'TelomereOffset' : 5,
+'TelomereLength' : 10,
 'BlastMaskLowercase' : True,
 'RoughBlastTask' : 'megablast',
 'RoughBlastWordSize' : 28,
