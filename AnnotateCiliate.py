@@ -26,7 +26,7 @@ parser.add_argument('-reblast', '--rb', dest='RB', action='store_true')
 # Get arguments
 if DEBUGGING:
 	#args = parser.parse_args('-mic Test_Files/mic.fasta -mac Test_Files/mac.fasta -o ../Output'.split())
-	args = parser.parse_args('-mic ../Assembly_Data/oxy_tri_-_mic_assembly.fasta -mac ../Assembly_Data/Test_File.fasta -o ../Output'.split())
+	args = parser.parse_args('-mic ../Assembly_Data/oxy_tri_-_mic_assembly.fasta -mac ../Assembly_Data/Test_File.fasta -o ../Output --rb'.split())
 	#args = parser.parse_args('-mic ./oxy_tri_-_mic_assembly.fasta -mac ./oxy_tri_-_mac_assembly_(with_pacbio).fasta -o ./Output'.split())
 else:
 	args = parser.parse_args()
@@ -51,7 +51,7 @@ re_comp = 0
 is_Valid_Re = False
 while not is_Valid_Re:
 	try:
-		re_comp = re.compile(regExp)
+		re_comp = re.compile(regExp, re.IGNORECASE)
 		is_Valid_Re = True
 	except re.error:
 		print('The regular expression is invalid, please type a valid regular expression:')
