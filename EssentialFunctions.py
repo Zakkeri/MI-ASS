@@ -248,7 +248,7 @@ def getGapsList(MDS_List, MAC_start, MAC_end):
 
 # This function outputs annotation results into the database load file
 
-def updateDatabaseInput(MDS_List, MIC_maps, left_Tel, right_Tel, MAC_start, MAC_end, Output_dir, contig):
+def updateDatabaseInput(MDS_List, MIC_maps, left_Tel, right_Tel, mac_length, Output_dir, contig):
 	# If MIC_maps are not empty, then update hsp file
 	if MIC_maps:
 		# Open hsp file to append
@@ -305,7 +305,7 @@ def updateDatabaseInput(MDS_List, MIC_maps, left_Tel, right_Tel, MAC_start, MAC_
 		tel_num += 1
 	
 	# Output to file
-	telFile.write(str(updateDatabaseInput.telID) + "\t\\N\t" + str(contig) + "\t" + str(MAC_end - MAC_start + 1) + "\t" + str(tel_num) + "\t")
+	telFile.write(str(updateDatabaseInput.telID) + "\t\\N\t" + str(contig) + "\t" + str(mac_length) + "\t" + str(tel_num) + "\t")
 	# Info about left telomere
 	if left_Tel:
 		telFile.write(str(left_Tel[0]+1) + "\t" + str(left_Tel[1]+1) + "\t" + str(left_Tel[1] - left_Tel[0] + 1) + "\t")

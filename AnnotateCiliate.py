@@ -318,7 +318,7 @@ for contig in sorted(mac_fasta):
 
 	# Update database input files
 	if Options['DatabaseUpdate']:
-		updateDatabaseInput(MDS_List, MIC_maps, left_Tel, right_Tel, MAC_start, MAC_end, Output_dir, contig)
+		updateDatabaseInput(MDS_List, MIC_maps, left_Tel, right_Tel, len(mac_fasta[contig]), Output_dir, contig)
 	
 logComment("Annotation is finished! Total time spent: " + str(time.time() - time1) + " seconds")
 # Close all files
