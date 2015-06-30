@@ -18,7 +18,6 @@ time1 = time.time()
 # Define argument parser
 parser = argparse.ArgumentParser()
 parser.add_argument('-mic', '--mic', dest='MIC')
-#parser.add_argument('-re', '--re', dest='RE')
 parser.add_argument('-mac', '--mac', dest='MAC')
 parser.add_argument('-o', '--o', dest='OUT')
 parser.add_argument('-reblast', '--rb', dest='RB', action='store_true')
@@ -30,7 +29,8 @@ if DEBUGGING:
 	#args = parser.parse_args('-mic ./oxy_tri_-_mic_assembly.fasta -mac ./oxy_tri_-_mac_assembly_(with_pacbio).fasta -o ./Output'.split())
 else:
 	args = parser.parse_args()
-	
+
+# Store arguments in corresponding variables
 regExp = Options['Tel_Reg_Exp']
 MICfile = args.MIC
 MACfile = args.MAC
@@ -46,8 +46,8 @@ while not os.path.isfile(MACfile):
 	print(MACfile, ' is not a file, please input a valid MAC file:')
 	MACfile = input()
 	
-# Test whether a regulat expression is a valid one
-re_comp = 0
+# Test whether a regular expression is a valid one
+re_comp = None
 is_Valid_Re = False
 while not is_Valid_Re:
 	try:
@@ -57,8 +57,8 @@ while not is_Valid_Re:
 		print('The regular expression is invalid, please type a valid regular expression:')
 		regExp = input()
 
-LogFile = None
 # Create output directory if needed
+LogFile = None
 try:
 	os.makedirs(Output_dir)
 	LogFile = open(Output_dir + '/log.txt', 'w')
@@ -96,7 +96,6 @@ if DEBUGGING:
 # Check if BLAST is installed
 output = None
 try:
-	#call('blastn -version')
 	output = subprocess.check_output("blastn -version".split(" "))
 except:
 	print('BLAST is not installed on the computer. Please install BLAST to run the program')
@@ -159,14 +158,18 @@ safeCreateDirectory(Output_dir + '/Annotated_MDS')
 # Create output directory for MIC annotation
 safeCreateDirectory(Output_dir + '/MIC_Annotation')	
 
+# Create output directory for masked contig seqeunces
+safeCreateDirectory(Output_dir + '/Masked_Contigs')	
+
 # Create database input directory and database load files
-safeCreateDirectory(Output_dir + '/Database_Input')	
-temp = open(Output_dir + '/Database_Input/hsp.tsv', 'w')
-temp.close()
-temp = open(Output_dir + '/Database_Input/mds.tsv', 'w')
-temp.close()
-temp = open(Output_dir + '/Database_Input/tel.tsv', 'w')
-temp.close()
+if Options['DatabaseUpdate']:
+	safeCreateDirectory(Output_dir + '/Database_Input')	
+	temp = open(Output_dir + '/Database_Input/hsp.tsv', 'w')
+	temp.close()
+	temp = open(Output_dir + '/Database_Input/mds.tsv', 'w')
+	temp.close()
+	temp = open(Output_dir + '/Database_Input/tel.tsv', 'w')
+	temp.close()
 
 # Start BLASTing and annotating
 logComment('Annotating ' + str(macCount) + ' MAC contigs...')
@@ -176,7 +179,7 @@ for contig in sorted(mac_fasta):
 		print("Annotating: ", str(contig))
 
 	# create file for masked telomeres
-	maskTel_file = open(Output_dir + '/hsp/rough/masked_' + str(contig) + '.fa', 'w')
+	maskTel_file = open(Output_dir + '/Masked_Contigs/' + str(contig) + '.fa', 'w')
 	maskTel_file.write(">" + str(contig) + "\n")
 	
 	# Run regular expression and mask telomeres
@@ -185,14 +188,17 @@ for contig in sorted(mac_fasta):
 	left_Tel = None
 	right_Tel = None
 	
-	# List for storing telomeric sequences that are actually not telomeres
+	# List for storing telomeric sequences that are not real telomeres
 	tel_seq = list()
 	
 	# If regular expression was identified, then process
 	if telomeres:
 		str_pos = 0
+		
+		# Get start and end coordinates of every telomeric sequence
 		tel_positions = [(m.span()[0], m.span()[1]) for m in telomeres]
-		# Check for the telomeres on the left
+		
+		# Check for the telomere on the left
 		indL = 0
 		for coord in tel_positions:
 			if coord[1] - coord[0] >= Options['TelomereLength'] and coord[0] <= Options['TelomereEndLimit']:
@@ -217,11 +223,12 @@ for contig in sorted(mac_fasta):
 			
 		# Mask telomeric sequence in the middle of contig
 		for coord in tel_positions[indL:]:
-			# If sequence is too short, or it is a right telomere, then skip it
+			# If sequence is too short then skip it
 			if coord[1] - coord[0] < Options['TelomereLength'] :
 				continue
 			# Otherwise, mask it
 			if(str_pos != coord[0]):
+				# Output seqeunce in upper case until the begining of the telomeric seqeunce
 				maskTel_file.write(seq[str_pos:coord[0]].upper())
 			maskTel_file.write(seq[coord[0]:coord[1]].lower())
 			# If this is not the right telomere, then add it to the telomeric position
@@ -251,6 +258,7 @@ for contig in sorted(mac_fasta):
 	if MIC_maps != "":
 		# Sort rough BLAST output
 		sortHSP_List(MIC_maps)
+		
 		# Annotate MDSs with rough BLAST hsps
 		getMDS_Annotation(MDS_List, MIC_maps, MAC_start, MAC_end)	
 	else:
@@ -273,6 +281,8 @@ for contig in sorted(mac_fasta):
 			temp_split = list()
 			indexMap = {}
 			ind = 0
+			
+			# Split hsps according to MIC contig name
 			for hsp in MIC_maps:
 				if hsp[1] in indexMap:
 					temp_split[indexMap[hsp[1]]].append(hsp)
@@ -280,7 +290,8 @@ for contig in sorted(mac_fasta):
 					indexMap[hsp[1]] = ind
 					ind += 1
 					temp_split.append([hsp])
-					
+			
+			# Add fine BLAST results into rough blast list
 			for hsp in fineBLAST:
 				if hsp[1] not in indexMap or not [x for x in temp_split[indexMap[hsp[1]]] if int(x[5]) <= int(hsp[5]) and int(x[6]) >= int(hsp[6])]:
 					MIC_maps.append(hsp)
@@ -291,7 +302,7 @@ for contig in sorted(mac_fasta):
 	# Output results and label MDSs
 	MDS_file = open(Output_dir + '/Annotated_MDS/' + str(contig) + '.tsv', 'w')
 	ind = 1
-	MDS_List = sorted(MDS_List, key = lambda x: x[0])
+	MDS_List.sort(key = lambda x: x[0])
 	
 	for mds in MDS_List[:-1]:
 		MDS_file.write(str(ind) + '\t' + str(mds[0]) + '\t' + str(mds[1]) + '\t' + str(mds[2]) + '\n')

@@ -20,7 +20,5 @@ Options = {
 'FineBlastUngapped' : True,
 'ThreadCount' : 2*multiprocessing.cpu_count(),
 'DatabaseUpdate' : True,
-#'MIC_Annotation_MDS_Overlap_Threshold' : .65,
-#'Tel_Reg_Exp' : "AAAACCCCAAAACCCC"
 'Tel_Reg_Exp' : "(A{0,4}(C{4}A{4})+C{0,4})|(C{0,4}(A{4}C{4})+A{0,4})|(T{0,4}(G{4}T{4})+G{0,4})|(G{0,4}(T{4}G{4})+T{0,4})|(A{1,4}C{4}A{1,4})|(C{1,4}A{4}C{1,4})|(T{1,4}G{4}T{1,4})|(G{1,4}T{4}G{1,4})"
 }

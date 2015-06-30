@@ -21,7 +21,7 @@ def run_Rough_BLAST(Output_dir, contig):
 		param.append("-lcase_masking")
 
 	param.append("-query")
-	param.append(Output_dir + "/hsp/rough/masked_" + str(contig) + ".fa")
+	param.append(Output_dir + "/Masked_Contigs/" + str(contig) + ".fa")
 	param.append("-db")
 	param.append(Output_dir + "/blast/mic")
 	param.append("-num_threads")
@@ -67,7 +67,7 @@ def run_Fine_BLAST(Output_dir, contig):
 		param.append("-lcase_masking")
 	
 	param.append("-query")
-	param.append(Output_dir + "/hsp/rough/masked_" + str(contig) + ".fa")
+	param.append(Output_dir + "/Masked_Contigs/" + str(contig) + ".fa")
 	param.append("-db")
 	param.append(Output_dir + "/blast/mic")
 	param.append("-num_threads")
@@ -205,12 +205,9 @@ def mapHSP_to_MDS(MIC_maps, MDS_List):
 		if not overlap:
 			continue
 			
-		# Define reduce function to decide what MDS the hsp is going to match the best
+		# Define reduce function to decide what MDS the hsp is going to match the best (has biggest overlap)
 		match = lambda a, b: a if min(a[1], int(hsp[6])) - max(a[0], int(hsp[5])) > min(b[1], int(hsp[6])) - max(b[0], int(hsp[5])) else b
 		matched_MDS = reduce(match, overlap)
-			
-		# check if the percentage of the overlap is above the threshold and label hsp if it does
-		#if (min(matched_MDS[1], int(hsp[6])) - max(matched_MDS[0], int(hsp[5])))/(matched_MDS[1] - matched_MDS[0]) >= Options['MIC_Annotation_MDS_Overlap_Threshold']:
 		
 		# Assign hsp to MDS
 		hsp[-1] = matched_MDS[-1]
