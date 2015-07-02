@@ -33,7 +33,7 @@ def run_Rough_BLAST(Output_dir, contig):
 	rough_out = subprocess.check_output(param)
 	
 	# Filter empty rows
-	roughVal = [x.rstrip() for x in rough_out.decode(sys.stdout.encoding).split('\n') if x != "" and float(x.rstrip().split(",")[11]) >= 3]
+	roughVal = [x.rstrip() for x in rough_out.decode(sys.stdout.encoding).split('\n') if x != "" and float(x.rstrip().split(",")[11]) >= Options['MIC_Coverage_Threshold']]
 	# Check if there are any hsps
 	if not roughVal:
 		return ""
@@ -78,7 +78,7 @@ def run_Fine_BLAST(Output_dir, contig):
 	fine_out = subprocess.check_output(param)
 	
 	# Filter empty rows
-	fineVal = [x.rstrip() for x in fine_out.decode(sys.stdout.encoding).split('\n') if x != "" and float(x.rstrip().split(",")[11]) >= 3]
+	fineVal = [x.rstrip() for x in fine_out.decode(sys.stdout.encoding).split('\n') if x != "" and float(x.rstrip().split(",")[11]) >= Options['MIC_Coverage_Threshold']]
 	# Check if there are any hsps
 	if not fineVal:
 		return ""
@@ -104,8 +104,10 @@ def readBLAST_file(Filename):
 	
 	# Read file line by line
 	for line in open(Filename, "r"):
-		# Parse and append line into the res list 
-		res.append(line.rstrip().split(","))
+		# Parse and append line into the res list
+		parsed =  line.rstrip().split(",")
+		if float(parsed[11]) >= Options['MIC_Coverage_Threshold']:
+			res.append(parsed)
 		
 	# Return list if it not empty and empty string otherwise
 	if res:
@@ -253,9 +255,7 @@ def updateDatabaseInput(MDS_List, MIC_maps, left_Tel, right_Tel, mac_length, Out
 		
 		# Output hsps to file
 		for hsp in MIC_maps:
-			# Update hsp ID
-			updateDatabaseInput.hspID += 1
-			
+									
 			# Get MIC start, end, and orientation
 			micStart = hsp[7]
 			micEnd = hsp[8]
@@ -266,7 +266,7 @@ def updateDatabaseInput(MDS_List, MIC_maps, left_Tel, right_Tel, mac_length, Out
 				micOrient = "-"
 			
 			# Print hsp
-			hspFile.write(str(updateDatabaseInput.hspID) + "\t" + hsp[0] + "\t\\N\t" + str(hsp[-1]) + "\t" + hsp[5] + "\t" + hsp[6] + "\t" + hsp[1] + 
+			hspFile.write("\\N\t" + hsp[0] + "\t\\N\t" + str(hsp[-1]) + "\t" + hsp[5] + "\t" + hsp[6] + "\t" + hsp[1] + 
 			"\t\\N\t" + micStart + "\t" + micEnd + "\t" + micOrient + "\t" + hsp[3] + "\t" + hsp[2] + "\t" + hsp[4] + "\t" + hsp[9] + "\t" + hsp[10] + 
 			"\t" + hsp[11] + "\n")
 		
@@ -280,18 +280,14 @@ def updateDatabaseInput(MDS_List, MIC_maps, left_Tel, right_Tel, mac_length, Out
 		
 		# Output mdss to file
 		for mds in MDS_List:
-			# Update mds ID
-			updateDatabaseInput.mdsID += 1
-			
 			#Print mds
-			mdsFile.write(str(updateDatabaseInput.mdsID) + "\t\\N\t" + str(contig) + "\t" + str(mds[-1]) + "\t" + str(mds[0]) + "\t" + 
+			mdsFile.write("\\N\t\\N\t" + str(contig) + "\t" + str(mds[-1]) + "\t" + str(mds[0]) + "\t" + 
 			str(mds[1]) + "\t" + str(mds[1] - mds[0] + 1) + "\t" + str(mds[2]) + "\n")
 		
 		# Close mds file
 		mdsFile.close()
 		
 	# Update telomeres file
-	updateDatabaseInput.telID += 1
 	telFile = open(Output_dir + '/Database_Input/tel.tsv', 'a')
 	
 	# Get number of telomeres
@@ -302,24 +298,20 @@ def updateDatabaseInput(MDS_List, MIC_maps, left_Tel, right_Tel, mac_length, Out
 		tel_num += 1
 	
 	# Output to file
-	telFile.write(str(updateDatabaseInput.telID) + "\t\\N\t" + str(contig) + "\t" + str(mac_length) + "\t" + str(tel_num) + "\t")
+	telFile.write("\\N\t\\N\t" + str(contig) + "\t" + str(mac_length) + "\t" + str(tel_num) + "\t")
 	# Info about left telomere
 	if left_Tel:
 		telFile.write(str(left_Tel[0]+1) + "\t" + str(left_Tel[1]+1) + "\t" + str(left_Tel[1] - left_Tel[0] + 1) + "\t")
 	else:
-		telFile.write("NULL\tNULL\t0\t")
+		telFile.write("\\N\t\\N\t0\t")
 	# infor about right telomere
 	if right_Tel:
 		telFile.write(str(right_Tel[0]+1) + "\t" + str(right_Tel[1]+1) + "\t" + str(right_Tel[1] - right_Tel[0] + 1) + "\n")
 	else:
-		telFile.write("NULL\tNULL\t0\n")	
+		telFile.write("\\N\t\\N\t0\n")	
 		
 	telFile.close()
-	
-# Static variables for updateDatabaseInput function
-updateDatabaseInput.hspID = 0
-updateDatabaseInput.mdsID = 0	
-updateDatabaseInput.telID = 0
+
 #------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 # This function sorts hsp list

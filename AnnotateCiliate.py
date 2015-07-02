@@ -24,8 +24,8 @@ parser.add_argument('-reblast', '--rb', dest='RB', action='store_true')
 
 # Get arguments
 if DEBUGGING:
-	#args = parser.parse_args('-mic Test_Files/mic.fasta -mac Test_Files/mac.fasta -o ../Output'.split())
-	args = parser.parse_args('-mic ../Assembly_Data/oxy_tri_-_mic_assembly.fasta -mac ../Assembly_Data/Test_File.fasta -o ../Output --rb'.split())
+	args = parser.parse_args('-mic ../Assembly_Data/Tetrahymena/tet_therm_processed-_mic_nuc.fa -mac ../Assembly_Data/Tetrahymena/Test_File.fasta -o ../Output_Tetrohymena'.split())
+	#args = parser.parse_args('-mic ../Assembly_Data/Trifallax/oxy_tri_-_mic_assembly.fasta -mac ../Assembly_Data/Trifallax/Test_File.fasta -o ../Output_Trifallax --rb'.split())
 	#args = parser.parse_args('-mic ./oxy_tri_-_mic_assembly.fasta -mac ./oxy_tri_-_mac_assembly_(with_pacbio).fasta -o ./Output'.split())
 else:
 	args = parser.parse_args()
@@ -204,7 +204,7 @@ for contig in sorted(mac_fasta):
 			if coord[1] - coord[0] >= Options['TelomereLength'] and coord[0] <= Options['TelomereEndLimit']:
 				maskTel_file.write(seq[str_pos:coord[0]].upper())
 				maskTel_file.write(seq[coord[0]:coord[1]].lower())
-				left_Tel = (coord[0],coord[1])
+				left_Tel = [coord[0],coord[1]]
 				str_pos = coord[1]
 				indL += 1
 				break
@@ -216,7 +216,7 @@ for contig in sorted(mac_fasta):
 		for i in range(len(tel_positions) - 1, indL-1, -1):
 			coord = tel_positions[i]
 			if coord[1] - coord[0] >= Options['TelomereLength'] and len(mac_fasta[contig]) - coord[1] <= Options['TelomereEndLimit']:
-				right_Tel = (coord[0], coord[1])
+				right_Tel = [coord[0], coord[1]]
 				break
 			if len(mac_fasta[contig]) - coord[1] > Options['TelomereEndLimit']:
 				break
@@ -239,7 +239,33 @@ for contig in sorted(mac_fasta):
 		# If there are still some letters left to print, print them
 		if str_pos != len(seq):
 			maskTel_file.write(seq[str_pos:len(seq)].upper())
-	
+		
+		# check if left telomeres can be extended
+		if left_Tel and tel_seq:
+			numMerged = 0
+			for tel in tel_seq:
+				# If two telomeric seqeunces are within tolerance error, merge them
+				if tel[0] - left_Tel[1] > Options["TelomericErrorTolerance"]:
+					break
+				left_Tel[1] = tel[1]
+				numMerged += 1
+			# Remove merged telomeres from the list
+			if numMerged > 0:
+				del tel_seq[:numMerged]
+					
+		# Check if right telomeres can be extended
+		if right_Tel and tel_seq:
+			numMerged = 0
+			for tel in reversed(tel_seq):
+				# If two telomeric seqeunces are within tolerance error, merge them
+				if right_Tel[0] - tel[1] > Options["TelomericErrorTolerance"]:
+					break
+				right_Tel[0] = tel[0]
+				numMerged += 1
+			# Remove merged telomeres from the list
+			if numMerged > 0:
+				del tel_seq[-numMerged:]
+							
 	# Close masked contig file
 	maskTel_file.close()
 	
