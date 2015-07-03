@@ -24,14 +24,17 @@ parser.add_argument('-reblast', '--rb', dest='RB', action='store_true')
 
 # Get arguments
 if DEBUGGING:
-	args = parser.parse_args('-mic ../Assembly_Data/Tetrahymena/tet_therm_processed-_mic_nuc.fa -mac ../Assembly_Data/Tetrahymena/Test_File.fasta -o ../Output_Tetrohymena'.split())
+	# Pre-setup arguments for use on my computer/server directory
+	args = parser.parse_args('-mic ../Assembly_Data/Tetrahymena/tet_therm_processed-_mic_nuc.fa -mac ../Assembly_Data/Tetrahymena/Test_File.fasta -o ../Output_Tetrohymena --rb'.split())
 	#args = parser.parse_args('-mic ../Assembly_Data/Trifallax/oxy_tri_-_mic_assembly.fasta -mac ../Assembly_Data/Trifallax/Test_File.fasta -o ../Output_Trifallax --rb'.split())
-	#args = parser.parse_args('-mic ./oxy_tri_-_mic_assembly.fasta -mac ./oxy_tri_-_mac_assembly_(with_pacbio).fasta -o ./Output'.split())
+	#args = parser.parse_args('-mic Trifallax/oxy_tri_-_mic_assembly.fasta -mac Trifallax/oxy_tri_-_mac_assembly_(with_pacbio).fasta -o Trifallax/Output'.split())
+	#args = parser.parse_args('-mic Tetrahymena/tet_therm_processed-_mic_nuc.fa -mac Tetrahymena/tet_therm_-_mac_nuc.fa -o Tetrahymena/Output --rb'.split())
 else:
 	args = parser.parse_args()
 
 # Store arguments in corresponding variables
-regExp = Options['Tel_Reg_Exp']
+regExp_5 = Options['Tel_Reg_Exp_5']
+regExp_3 = Options['Tel_Reg_Exp_3']
 MICfile = args.MIC
 MACfile = args.MAC
 Output_dir = args.OUT
@@ -46,16 +49,26 @@ while not os.path.isfile(MACfile):
 	print(MACfile, ' is not a file, please input a valid MAC file:')
 	MACfile = input()
 	
-# Test whether a regular expression is a valid one
-re_comp = None
+# Test whether regular expressions are valid one
+re_comp_5 = None
+re_comp_3 = None
 is_Valid_Re = False
 while not is_Valid_Re:
 	try:
-		re_comp = re.compile(regExp, re.IGNORECASE)
+		re_comp_5 = re.compile(regExp_5, re.IGNORECASE)
 		is_Valid_Re = True
 	except re.error:
-		print('The regular expression is invalid, please type a valid regular expression:')
-		regExp = input()
+		print('The 5\' regular expression is invalid, please type a valid regular expression:')
+		regExp_5 = input()
+
+is_Valid_Re = False
+while not is_Valid_Re:
+	try:
+		re_comp_3 = re.compile(regExp_3, re.IGNORECASE)
+		is_Valid_Re = True
+	except re.error:
+		print('The 3\' regular expression is invalid, please type a valid regular expression:')
+		regExp_3 = input()
 
 # Create output directory if needed
 LogFile = None
@@ -91,7 +104,7 @@ def safeCreateDirectory(dir):
 		
 # Print parsed arguments
 if DEBUGGING:
-	print(regExp, MICfile, MACfile)
+	print(regExp_5, regExp_3, MICfile, MACfile)
 
 # Check if BLAST is installed
 output = None
@@ -182,90 +195,30 @@ for contig in sorted(mac_fasta):
 	maskTel_file = open(Output_dir + '/Masked_Contigs/' + str(contig) + '.fa', 'w')
 	maskTel_file.write(">" + str(contig) + "\n")
 	
-	# Run regular expression and mask telomeres
+	# Get nucleotide seqeunce
 	seq = str(mac_fasta[contig])
-	telomeres = re_comp.finditer(seq)
-	left_Tel = None
-	right_Tel = None
 	
-	# List for storing telomeric sequences that are not real telomeres
+	# List of telomeric sequences
 	tel_seq = list()
 	
-	# If regular expression was identified, then process
-	if telomeres:
-		str_pos = 0
-		
-		# Get start and end coordinates of every telomeric sequence
-		tel_positions = [(m.span()[0], m.span()[1]) for m in telomeres]
-		
-		# Check for the telomere on the left
-		indL = 0
-		for coord in tel_positions:
-			if coord[1] - coord[0] >= Options['TelomereLength'] and coord[0] <= Options['TelomereEndLimit']:
-				maskTel_file.write(seq[str_pos:coord[0]].upper())
-				maskTel_file.write(seq[coord[0]:coord[1]].lower())
-				left_Tel = [coord[0],coord[1]]
-				str_pos = coord[1]
-				indL += 1
-				break
-			if coord[0] > Options['TelomereEndLimit']:
-				break
-			indL += 1
-					
-		# Check for telomere on the right
-		for i in range(len(tel_positions) - 1, indL-1, -1):
-			coord = tel_positions[i]
-			if coord[1] - coord[0] >= Options['TelomereLength'] and len(mac_fasta[contig]) - coord[1] <= Options['TelomereEndLimit']:
-				right_Tel = [coord[0], coord[1]]
-				break
-			if len(mac_fasta[contig]) - coord[1] > Options['TelomereEndLimit']:
-				break
-			
-		# Mask telomeric sequence in the middle of contig
-		for coord in tel_positions[indL:]:
-			# If sequence is too short then skip it
-			if coord[1] - coord[0] < Options['TelomereLength'] :
-				continue
-			# Otherwise, mask it
-			if(str_pos != coord[0]):
-				# Output seqeunce in upper case until the begining of the telomeric seqeunce
-				maskTel_file.write(seq[str_pos:coord[0]].upper())
-			maskTel_file.write(seq[coord[0]:coord[1]].lower())
-			# If this is not the right telomere, then add it to the telomeric position
-			if not right_Tel or right_Tel[0] != coord[0]:
-				tel_seq.append((coord[0], coord[1]))
-			str_pos = coord[1]
-		
-		# If there are still some letters left to print, print them
-		if str_pos != len(seq):
-			maskTel_file.write(seq[str_pos:len(seq)].upper())
-		
-		# check if left telomeres can be extended
-		if left_Tel and tel_seq:
-			numMerged = 0
-			for tel in tel_seq:
-				# If two telomeric seqeunces are within tolerance error, merge them
-				if tel[0] - left_Tel[1] > Options["TelomericErrorTolerance"]:
-					break
-				left_Tel[1] = tel[1]
-				numMerged += 1
-			# Remove merged telomeres from the list
-			if numMerged > 0:
-				del tel_seq[:numMerged]
-					
-		# Check if right telomeres can be extended
-		if right_Tel and tel_seq:
-			numMerged = 0
-			for tel in reversed(tel_seq):
-				# If two telomeric seqeunces are within tolerance error, merge them
-				if right_Tel[0] - tel[1] > Options["TelomericErrorTolerance"]:
-					break
-				right_Tel[0] = tel[0]
-				numMerged += 1
-			# Remove merged telomeres from the list
-			if numMerged > 0:
-				del tel_seq[-numMerged:]
-							
+	# Identify 5' telomere
+	left_Tel_5 = identifyTelomere(re_comp_5, seq, tel_seq, 5)
+	
+	# Identify 3' telomere
+	right_Tel_3 = identifyTelomere(re_comp_3, seq, tel_seq, 3)
+	
+	# Sort telomeric sequence positions and mask telomeres
+	tel_seq.sort()
+	str_pos = 0
+	for coord in tel_seq:
+		if str_pos != coord[0]:
+			maskTel_file.write(seq[str_pos:coord[0]].upper())
+		maskTel_file.write(seq[coord[0]:coord[1]].lower())
+		str_pos = coord[1]
+	# If there are still some letters left to print, print them
+	if str_pos != len(seq):
+		maskTel_file.write(seq[str_pos:len(seq)].upper())
+								
 	# Close masked contig file
 	maskTel_file.close()
 	
@@ -273,9 +226,9 @@ for contig in sorted(mac_fasta):
 	MIC_maps = readBLAST_file(Output_dir + "/hsp/rough/" + str(contig) + ".csv") if not ReBlast and os.path.isfile(Output_dir + "/hsp/rough/" + str(contig) + ".csv") else run_Rough_BLAST(Output_dir, str(contig))
 		
 	# Get MAC start and MAC end with respect to telomeres
-	#print(left_Tel, " ", right_Tel)
-	MAC_start = 1 if not left_Tel else left_Tel[1]
-	MAC_end = len(mac_fasta[contig]) if not right_Tel else right_Tel[0]
+	#print(left_Tel_5, " ", right_Tel_3)
+	MAC_start = 1 if not left_Tel_5 else left_Tel_5[1]
+	MAC_end = len(mac_fasta[contig]) if not right_Tel_3 else right_Tel_3[0]
 	#Debuging message		
 	#print(contig, " start: ", MAC_start, " end: ", MAC_end)
 	
@@ -355,7 +308,7 @@ for contig in sorted(mac_fasta):
 
 	# Update database input files
 	if Options['DatabaseUpdate']:
-		updateDatabaseInput(MDS_List, MIC_maps, left_Tel, right_Tel, len(mac_fasta[contig]), Output_dir, contig)
+		updateDatabaseInput(MDS_List, MIC_maps, left_Tel_5, right_Tel_3, len(mac_fasta[contig]), Output_dir, contig)
 	
 logComment("Annotation is finished! Total time spent: " + str(time.time() - time1) + " seconds")
 # Close all files

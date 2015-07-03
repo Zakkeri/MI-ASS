@@ -324,10 +324,74 @@ def sortHSP_List(MIC_maps):
 		# Run sort
 		MIC_maps.sort(key = sort_func, reverse=True)
 	
+#------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+# This function runs telomeric regular expression, identifies telomere (if any) and stores telomeric sequences in the list
+# Note: side = 5 is for 5' telomere and side = 3 is for 3' telomere
+
+def identifyTelomere(reg_exp, seq, tel_seq, side):
+	# Telomere to return
+	tel_toReturn = None
 	
+	# Get the list of telomeric sequences
+	telomeres = reg_exp.finditer(seq)
+	tel_positions = sorted([(m.span()[0], m.span()[1]) for m in telomeres])
+	# If this is a 5' telomeres
+	if side == 5:
+		# Go through each telomeric seq and build a telomere
+		ind = 0
+		for coord in tel_positions:
+			if coord[1] - coord[0] >= Options['TelomereLength'] and coord[0] <= Options['TelomereEndLimit']:
+				tel_toReturn = [coord[0], coord[1]]
+				ind += 1
+				break
+			if coord[0] > Options['TelomereEndLimit']:
+				break	
+			ind += 1
+			
+		# check if left (5') telomeres can be extended
+		if tel_toReturn and tel_positions:
+			for tel in tel_positions[ind:]:
+				# If two telomeric sequences are within tolerance error, merge them
+				if tel[0] - tel_toReturn[1] > Options["TelomericErrorTolerance"]:
+					break
+				tel_toReturn[1] = tel[1]
 	
+	# If this is a 3' telomeres			
+	elif side == 3:
+		# Go through each telomeric seq and build a telomere
+		ind = 0
+		for coord in reversed(tel_positions):
+			if coord[1] - coord[0] >= Options['TelomereLength'] and len(seq) - coord[1] <= Options['TelomereEndLimit']:
+				tel_toReturn = [coord[0], coord[1]]
+				ind += 1
+				break
+			if len(seq) - coord[1] > Options['TelomereEndLimit']:
+				break	
+			ind += 1
+		# check if right (3') telomeres can be extended
+		if tel_toReturn and tel_positions:
+			for i in range(len(tel_positions) - ind - 1, -1, -1):
+				tel = tel_positions[i]
+				# If two telomeric sequences are within tolerance error, merge them
+				if tel_toReturn[0] - tel[1] > Options["TelomericErrorTolerance"]:
+					break
+				tel_toReturn[0] = tel[0]
 	
+	# We have an error
+	else:
+		print("Error in identifyTelomere function, side = ", side, " while allowed values are 3 and 5")
+		sys.exit()
 	
+	# Remove too short, non-telomeric sequences
+	if tel_toReturn:
+		tel_positions = [x for x in tel_positions if (x[1] - x[0] + 1) >= Options['TelomereLength'] or (tel_toReturn[0] <= x[0] and tel_toReturn[1] >= x[1])]
+	else:
+		tel_positions = [x for x in tel_positions if (x[1] - x[0] + 1) >= Options['TelomereLength']]
+	# Append telomeric positions to tel_seq list
+	tel_seq += tel_positions
+	
+	return tel_toReturn
 	
 	
 	
