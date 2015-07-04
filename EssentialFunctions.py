@@ -1,8 +1,72 @@
 # Python file with all essential functions used during CiliateAnnotation program execution
 import subprocess
 import sys
+import datetime
+import time
+import os.path
+import errno
 from settings import *
 from functools import reduce
+
+#------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+# Define log comment function for the ease of use
+
+def logComment(comment):
+	logComment.logFile.write(datetime.datetime.now().strftime("%I:%M%p %B %d %Y") + ' - ' + comment + '\n')
+	logComment.logFile.flush()
+
+# Log file
+logComment.logFile = None
+#------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+# Define create directory function
+
+def safeCreateDirectory(dir):
+	try:
+		os.makedirs(dir)
+		logComment('Directory ' + dir + ' created')
+	except OSError as exception:
+		if exception.errno != errno.EEXIST:
+			raise
+#------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+# This function creates all necessary output folders and files
+
+def createOutputDirectories(Output_dir):
+	# Create BLAST database directory
+	safeCreateDirectory(Output_dir + '/blast')
+
+	# Create hsp, hsp/rough, hsp/fine directtories
+	safeCreateDirectory(Output_dir + '/hsp')
+	safeCreateDirectory(Output_dir + '/hsp/rough')
+	safeCreateDirectory(Output_dir + '/hsp/fine')
+	
+	# Create output directory for MAC mds
+	safeCreateDirectory(Output_dir + '/Annotated_MDS')	
+
+	# Create output directory for MIC annotation
+	safeCreateDirectory(Output_dir + '/MIC_Annotation')	
+
+	# Create output directory for masked contig seqeunces
+	safeCreateDirectory(Output_dir + '/Masked_Contigs')	
+
+	# Create database input directory and database load files
+	if Options['DatabaseUpdate']:
+		safeCreateDirectory(Output_dir + '/Database_Input')	
+		temp = open(Output_dir + '/Database_Input/hsp.tsv', 'w')
+		temp.close()
+		temp = open(Output_dir + '/Database_Input/mds.tsv', 'w')
+		temp.close()
+		temp = open(Output_dir + '/Database_Input/tel.tsv', 'w')
+		temp.close()
+	
+	# Create output gff3 directory and file
+	safeCreateDirectory(Output_dir + '/GFF')
+	gffFile = open(Output_dir + "/GFF/mac_mds.gff3", "w")
+	gffFile.write("##gff-version 3\n")
+	gffFile.close()
+	
 #------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 # This function runs rough BLAST and returns the hsp result list
@@ -281,7 +345,7 @@ def updateDatabaseInput(MDS_List, MIC_maps, left_Tel, right_Tel, mac_length, Out
 		# Output mdss to file
 		for mds in MDS_List:
 			#Print mds
-			mdsFile.write("\\N\t\\N\t" + str(contig) + "\t" + str(mds[-1]) + "\t" + str(mds[0]) + "\t" + 
+			mdsFile.write("\\N\t\\N\t" + contig + "\t" + str(mds[-1]) + "\t" + str(mds[0]) + "\t" + 
 			str(mds[1]) + "\t" + str(mds[1] - mds[0] + 1) + "\t" + str(mds[2]) + "\n")
 		
 		# Close mds file
@@ -298,7 +362,7 @@ def updateDatabaseInput(MDS_List, MIC_maps, left_Tel, right_Tel, mac_length, Out
 		tel_num += 1
 	
 	# Output to file
-	telFile.write("\\N\t\\N\t" + str(contig) + "\t" + str(mac_length) + "\t" + str(tel_num) + "\t")
+	telFile.write("\\N\t\\N\t" + contig + "\t" + str(mac_length) + "\t" + str(tel_num) + "\t")
 	# Info about left telomere
 	if left_Tel:
 		telFile.write(str(left_Tel[0]+1) + "\t" + str(left_Tel[1]+1) + "\t" + str(left_Tel[1] - left_Tel[0] + 1) + "\t")
@@ -393,9 +457,20 @@ def identifyTelomere(reg_exp, seq, tel_seq, side):
 	
 	return tel_toReturn
 	
+#------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+# This function updates mac_mds.gff3 file
+
+def updateGFF(contig, MDS_List, Output_dir):
+	# Open gff file
+	gff = open(Output_dir + "/GFF/mac_mds.gff3", "a")
+		
+	# Output every mds
+	for mds in MDS_List:
+		gff.write(contig + "\tMI-ASS\tmds\t" + str(mds[0]) + "\t" + str(mds[1]) + "\t" + ".\t.\t.\tID=mds{0:06d};".format(updateGFF.mdsID) + "Name=mds_" + str(mds[-1]) + ";Target=" + contig + "\n")
+		updateGFF.mdsID += 1
 	
+	gff.close()
 	
-	
-	
-	
+updateGFF.mdsID = Options['MDS_id_start']
 	

@@ -1,10 +1,6 @@
 # Used libraries
 import argparse
-import os.path
 import re
-import errno
-import datetime
-import time
 from io import StringIO
 from pyfasta import Fasta
 from operator import itemgetter
@@ -25,8 +21,8 @@ parser.add_argument('-reblast', '--rb', dest='RB', action='store_true')
 # Get arguments
 if DEBUGGING:
 	# Pre-setup arguments for use on my computer/server directory
-	args = parser.parse_args('-mic ../Assembly_Data/Tetrahymena/tet_therm_processed-_mic_nuc.fa -mac ../Assembly_Data/Tetrahymena/Test_File.fasta -o ../Output_Tetrohymena --rb'.split())
-	#args = parser.parse_args('-mic ../Assembly_Data/Trifallax/oxy_tri_-_mic_assembly.fasta -mac ../Assembly_Data/Trifallax/Test_File.fasta -o ../Output_Trifallax --rb'.split())
+	#args = parser.parse_args('-mic ../Assembly_Data/Tetrahymena/tet_therm_processed-_mic_nuc.fa -mac ../Assembly_Data/Tetrahymena/Test_File.fasta -o ../Output_Tetrohymena'.split())
+	args = parser.parse_args('-mic ../Assembly_Data/Trifallax/oxy_tri_-_mic_assembly.fasta -mac ../Assembly_Data/Trifallax/Test_File.fasta -o ../Output_Trifallax --rb'.split())
 	#args = parser.parse_args('-mic Trifallax/oxy_tri_-_mic_assembly.fasta -mac Trifallax/oxy_tri_-_mac_assembly_(with_pacbio).fasta -o Trifallax/Output'.split())
 	#args = parser.parse_args('-mic Tetrahymena/tet_therm_processed-_mic_nuc.fa -mac Tetrahymena/tet_therm_-_mac_nuc.fa -o Tetrahymena/Output --rb'.split())
 else:
@@ -83,25 +79,9 @@ except OSError as exception:
 	else:
 		raise
 
-#-----------------------------------------------------------------------------------------------------
-# Define log comment function for the ease of use
-def logComment(comment):
-	global LogFile
-	LogFile.write(datetime.datetime.now().strftime("%I:%M%p %B %d %Y") + ' - ' + comment + '\n')
-	LogFile.flush()
-#-----------------------------------------------------------------------------------------------------
+# Set logComment function file attribute
+logComment.logFile = LogFile
 
-#-----------------------------------------------------------------------------------------------------
-# Define create directory function
-def safeCreateDirectory(dir):
-	try:
-		os.makedirs(dir)
-		logComment('Directory ' + dir + ' created')
-	except OSError as exception:
-		if exception.errno != errno.EEXIST:
-			raise
-#-----------------------------------------------------------------------------------------------------
-		
 # Print parsed arguments
 if DEBUGGING:
 	print(regExp_5, regExp_3, MICfile, MACfile)
@@ -117,8 +97,10 @@ except:
 
 logComment("BLAST version: " + output.decode(sys.stdout.encoding).split('\n')[0])
 
-# Create BLAST database (and directory), if it doesn't exist
-safeCreateDirectory(Output_dir + '/blast')
+# Create output directories
+createOutputDirectories(Output_dir)
+
+# Create BLAST database, if it doesn't exist
 if not os.path.exists(Output_dir + '/blast/mic.nsq'):
 	logComment('Building BLAST database from' + MICfile)
 	output = subprocess.check_output(("makeblastdb -in " + str(MICfile) + ' -out ' +  Output_dir + '/blast/mic -dbtype nucl -parse_seqids -hash_index').split(" "))
@@ -143,11 +125,6 @@ except Exception as e:
 macCount = len(mac_fasta.keys())
 logComment(str(macCount) + ' sequences imported')
 
-# Create hsp, hsp/rough, hsp/fine directtories
-safeCreateDirectory(Output_dir + '/hsp')
-safeCreateDirectory(Output_dir + '/hsp/rough')
-safeCreateDirectory(Output_dir + '/hsp/fine')
-
 # Rough Blast parameters
 dust = "yes" if Options['RoughBlastDust'] else "no"
 ungapped = " -ungapped " if Options['RoughBlastUngapped'] else ""
@@ -164,25 +141,6 @@ ungapped = " -ungapped " if Options['FineBlastUngapped'] else ""
 logComment("BLAST fine pass parameters:\nblastn -task " + Options['FineBlastTask'] + " -word_size " + str(Options['FineBlastWordSize']) + " -max_hsps 0 " + 
 "-max_target_seqs 10000 -dust " + dust + ungapped + maskLowercase + 
 "-outfmt \"10 qseqid sseqid pident length mismatch qstart qend sstart send evalue bitscore qcovs\"" + " -num_threads " + str(Options['ThreadCount']) + "\n")
-
-# Create output directory for MAC mds
-safeCreateDirectory(Output_dir + '/Annotated_MDS')	
-
-# Create output directory for MIC annotation
-safeCreateDirectory(Output_dir + '/MIC_Annotation')	
-
-# Create output directory for masked contig seqeunces
-safeCreateDirectory(Output_dir + '/Masked_Contigs')	
-
-# Create database input directory and database load files
-if Options['DatabaseUpdate']:
-	safeCreateDirectory(Output_dir + '/Database_Input')	
-	temp = open(Output_dir + '/Database_Input/hsp.tsv', 'w')
-	temp.close()
-	temp = open(Output_dir + '/Database_Input/mds.tsv', 'w')
-	temp.close()
-	temp = open(Output_dir + '/Database_Input/tel.tsv', 'w')
-	temp.close()
 
 # Start BLASTing and annotating
 logComment('Annotating ' + str(macCount) + ' MAC contigs...')
@@ -308,7 +266,10 @@ for contig in sorted(mac_fasta):
 
 	# Update database input files
 	if Options['DatabaseUpdate']:
-		updateDatabaseInput(MDS_List, MIC_maps, left_Tel_5, right_Tel_3, len(mac_fasta[contig]), Output_dir, contig)
+		updateDatabaseInput(MDS_List, MIC_maps, left_Tel_5, right_Tel_3, len(mac_fasta[contig]), Output_dir, str(contig))
+		
+	# Update gff file
+	updateGFF(str(contig), MDS_List, Output_dir)
 	
 logComment("Annotation is finished! Total time spent: " + str(time.time() - time1) + " seconds")
 # Close all files
