@@ -259,13 +259,14 @@ def addGaps(MDS_List, MAC_start, MAC_end):
 	if len(MAC_Interval) > 1:
 		prev = MAC_Interval[0]
 		for interv in MAC_Interval[1:]:
-			MDS_List.append([prev[1], interv[0],1])
+			if (interv[0] - prev[1]) >= Options['MinGapMDS_Size']:
+				MDS_List.append([prev[1], interv[0],1])
 			prev = interv
 			
 	# Check for gaps at the begining of MAC and at the end of MAC
-	if MAC_Interval[0][0] - MAC_start > 1:
+	if MAC_Interval[0][0] - MAC_start >= Options['MinGapMDS_Size']:
 		MDS_List.append([MAC_start, MAC_Interval[0][0], 1])
-	if MAC_end - MAC_Interval[-1][1] > 1:
+	if MAC_end - MAC_Interval[-1][1] >= Options['MinGapMDS_Size']:
 		MDS_List.append([MAC_Interval[-1][1], MAC_end, 1])
 #------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
