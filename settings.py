@@ -23,8 +23,8 @@ Options = {
 'MIC_Coverage_Threshold' : 10,
 'TelomericErrorTolerance' : 5,
 'MDS_id_start' : 1,
-#'Tel_Reg_Exp_5' : "((AA){0,1}(CCCCAA)+(CCCC){0,1})",
-#'Tel_Reg_Exp_3' : "((TT){0,1}(GGGGTT)+(GGGG){0,1})"
-'Tel_Reg_Exp_5' : "(A{0,4}(C{4}A{4})+C{0,4})|(C{0,4}(A{4}C{4})+A{0,4})|(A{1,4}C{4}A{1,4})|(C{1,4}A{4}C{1,4})",
-'Tel_Reg_Exp_3' : "(T{0,4}(G{4}T{4})+G{0,4})|(G{0,4}(T{4}G{4})+T{0,4})|(T{1,4}G{4}T{1,4})|(G{1,4}T{4}G{1,4})"
+'Tel_Reg_Exp_5' : "((AA){0,1}(CCCCAA)+(CCCC){0,1})",
+'Tel_Reg_Exp_3' : "((TT){0,1}(GGGGTT)+(GGGG){0,1})"
+#'Tel_Reg_Exp_5' : "(A{0,4}(C{4}A{4})+C{0,4})|(C{0,4}(A{4}C{4})+A{0,4})|(A{1,4}C{4}A{1,4})|(C{1,4}A{4}C{1,4})",
+#'Tel_Reg_Exp_3' : "(T{0,4}(G{4}T{4})+G{0,4})|(G{0,4}(T{4}G{4})+T{0,4})|(T{1,4}G{4}T{1,4})|(G{1,4}T{4}G{1,4})"
 }

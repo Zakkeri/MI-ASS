@@ -21,8 +21,8 @@ parser.add_argument('-reblast', '--rb', dest='RB', action='store_true')
 # Get arguments
 if DEBUGGING:
 	# Pre-setup arguments for use on my computer/server directory
-	#args = parser.parse_args('-mic ../Assembly_Data/Tetrahymena/tet_therm_processed-_mic_nuc.fa -mac ../Assembly_Data/Tetrahymena/Test_File.fasta -o ../Output_Tetrohymena'.split())
-	args = parser.parse_args('-mic ../Assembly_Data/Trifallax/oxy_tri_-_mic_assembly.fasta -mac ../Assembly_Data/Trifallax/Test_File.fasta -o ../Output_Trifallax --rb'.split())
+	args = parser.parse_args('-mic ../Assembly_Data/Tetrahymena/tet_therm_processed-_mic_nuc.fa -mac ../Assembly_Data/Tetrahymena/Test_File.fasta -o ../Output_Tetrohymena'.split())
+	#args = parser.parse_args('-mic ../Assembly_Data/Trifallax/oxy_tri_-_mic_assembly.fasta -mac ../Assembly_Data/Trifallax/Test_File.fasta -o ../Output_Trifallax'.split())
 	#args = parser.parse_args('-mic Trifallax/oxy_tri_-_mic_assembly.fasta -mac Trifallax/oxy_tri_-_mac_assembly_(with_pacbio).fasta -o Trifallax/Output'.split())
 	#args = parser.parse_args('-mic Tetrahymena/tet_therm_processed-_mic_nuc.fa -mac Tetrahymena/tet_therm_-_mac_nuc.fa -o Tetrahymena/Output --rb'.split())
 else:
@@ -270,6 +270,10 @@ for contig in sorted(mac_fasta):
 		
 	# Update gff file
 	updateGFF(str(contig), MDS_List, Output_dir)
+	
+	# Identify scrambling on the best fitting MIC contigs
+	identifyScrambling(MIC_maps, MDS_List, Output_dir)
+	
 	
 logComment("Annotation is finished! Total time spent: " + str(time.time() - time1) + " seconds")
 # Close all files

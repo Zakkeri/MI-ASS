@@ -67,6 +67,17 @@ def createOutputDirectories(Output_dir):
 	gffFile.write("##gff-version 3\n")
 	gffFile.close()
 	
+	# Create output directories for MIC scrambling patterns
+	safeCreateDirectory(Output_dir + "/Scrambling/All")
+	safeCreateDirectory(Output_dir + "/Scrambling/Complete")
+	# Remove the old content of Complete folders
+	for f in os.listdir(Output_dir + "/Scrambling/Complete"):
+		file_path = os.path.join(Output_dir + "/Scrambling/Complete", f)
+		try:
+			if os.path.isfile(file_path):
+				os.unlink(file_path)
+		except Exception as e:
+			print(e)
 #------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 # This function runs rough BLAST and returns the hsp result list
@@ -474,3 +485,65 @@ def updateGFF(contig, MDS_List, Output_dir):
 	
 updateGFF.mdsID = Options['MDS_id_start']
 	
+#------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+# This function identifies best MIC contigs from which MAC was mapped and identifies scrambling
+
+def identifyScrambling(MIC_maps, MDS_List, Output_dir):
+	#MIC_maps.sort(key=lambda x: (float(x[11]), x[1]), reverse=True)
+	if not MIC_maps:
+		return
+	# Build a map: MIC contig to the list of its hsps
+	cont_to_hsp = {}
+	
+	for hsp in MIC_maps:
+		if hsp[1] in cont_to_hsp:
+			cont_to_hsp[hsp[1]].append(hsp)
+		else:
+			cont_to_hsp[hsp[1]] = [hsp]
+	
+	# map MIC contigs to number of distinct mdss it has
+	cont_to_mds = {}
+	
+	for mic in cont_to_hsp:
+		mdsNUM = len(set([x[-1] for x in cont_to_hsp[mic]]))
+		cont_to_mds[mic] = mdsNUM
+	
+	MICs = list(cont_to_hsp.keys())
+	MICs.sort(key=lambda x: (cont_to_mds[x], float(cont_to_hsp[x][0][11]), len(cont_to_hsp[x])), reverse=True)
+	
+	out = open(Output_dir + "/Scrambling/All/" + MIC_maps[0][0] + ".tsv", "w")
+	for mic in MICs:
+		next = sorted(cont_to_hsp[mic], key=lambda x: int(x[7]))
+		out.write(MIC_maps[0][0] + "\t" + mic + "\t" + "{")
+		for hsp in next[:-1]:
+			out.write(("-" if int(hsp[7]) > int(hsp[8]) else "") + str(hsp[-1]) + ",")
+		out.write(("-" if int(next[-1][7]) > int(next[-1][8]) else "") + str(next[-1][-1]) + "}\n")		
+		
+		# Check if this is a complete mapping
+		if cont_to_mds[mic] == len(MDS_List):
+			comp_out = open(Output_dir + "/Scrambling/Complete/" + MIC_maps[0][0] + ".tsv", "a")
+			comp_out.write(MIC_maps[0][0] + "\t" + mic + "\t" + "{")
+			for hsp in next[:-1]:
+				comp_out.write(("-" if int(hsp[7]) > int(hsp[8]) else "") + str(hsp[-1]) + ",")
+			comp_out.write(("-" if int(next[-1][7]) > int(next[-1][8]) else "") + str(next[-1][-1]) + "}\n")
+			comp_out.close()
+		
+	out.close()
+
+	
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
