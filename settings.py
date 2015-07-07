@@ -22,7 +22,6 @@ Options = {
 'DatabaseUpdate' : True,
 'MIC_Coverage_Threshold' : 10,
 'TelomericErrorTolerance' : 5,
-'MinGapMDS_Size' : 5,
 'MDS_id_start' : 1,
 #'Tel_Reg_Exp_5' : "((AA){0,1}(CCCCAA)+(CCCC){0,1})",
 #'Tel_Reg_Exp_3' : "((TT){0,1}(GGGGTT)+(GGGG){0,1})"

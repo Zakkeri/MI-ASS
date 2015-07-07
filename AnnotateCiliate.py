@@ -24,7 +24,7 @@ if DEBUGGING:
 	#args = parser.parse_args('-mic ../Assembly_Data/Tetrahymena/tet_therm_processed-_mic_nuc.fa -mac ../Assembly_Data/Tetrahymena/Test_File.fasta -o ../Output_Tetrohymena'.split())
 	args = parser.parse_args('-mic ../Assembly_Data/Trifallax/oxy_tri_-_mic_assembly.fasta -mac ../Assembly_Data/Trifallax/Test_File.fasta -o ../Output_Trifallax'.split())
 	#args = parser.parse_args('-mic Trifallax/oxy_tri_-_mic_assembly.fasta -mac Trifallax/oxy_tri_-_mac_assembly_(with_pacbio).fasta -o Trifallax/Output'.split())
-	#args = parser.parse_args('-mic Tetrahymena/tet_therm_processed-_mic_nuc.fa -mac Tetrahymena/tet_therm_-_mac_nuc.fa -o Tetrahymena/Output --rb'.split())
+	#args = parser.parse_args('-mic Tetrahymena/tet_therm_processed-_mic_nuc.fa -mac Tetrahymena/tet_therm_-_mac_nuc.fa -o Tetrahymena/Output'.split())
 else:
 	args = parser.parse_args()
 
@@ -185,8 +185,8 @@ for contig in sorted(mac_fasta):
 		
 	# Get MAC start and MAC end with respect to telomeres
 	#print(left_Tel_5, " ", right_Tel_3)
-	MAC_start = 1 if not left_Tel_5 else left_Tel_5[1]
-	MAC_end = len(mac_fasta[contig]) if not right_Tel_3 else right_Tel_3[0]
+	MAC_start = 1 if not left_Tel_5 else left_Tel_5[1] + 1
+	MAC_end = len(mac_fasta[contig]) if not right_Tel_3 else right_Tel_3[0] - 1
 	#Debuging message		
 	#print(contig, " start: ", MAC_start, " end: ", MAC_end)
 	
