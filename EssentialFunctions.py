@@ -5,6 +5,8 @@ import datetime
 import time
 import os.path
 import errno
+import regex as re
+from datetime import datetime
 from settings import *
 from functools import reduce
 
@@ -13,7 +15,7 @@ from functools import reduce
 # Define log comment function for the ease of use
 
 def logComment(comment):
-	logComment.logFile.write(datetime.datetime.now().strftime("%I:%M%p %B %d %Y") + ' - ' + comment + '\n')
+	logComment.logFile.write(datetime.now().strftime("%I:%M%p %B %d %Y") + ' - ' + comment + '\n')
 	logComment.logFile.flush()
 
 # Log file
@@ -67,17 +69,13 @@ def createOutputDirectories(Output_dir):
 	gffFile.write("##gff-version 3\n")
 	gffFile.close()
 	
-	# Create output directories for MIC scrambling patterns
-	safeCreateDirectory(Output_dir + "/Scrambling/All")
-	safeCreateDirectory(Output_dir + "/Scrambling/Complete")
-	# Remove the old content of Complete folders
-	for f in os.listdir(Output_dir + "/Scrambling/Complete"):
-		file_path = os.path.join(Output_dir + "/Scrambling/Complete", f)
-		try:
-			if os.path.isfile(file_path):
-				os.unlink(file_path)
-		except Exception as e:
-			print(e)
+	# Create output directory and files for MIC scrambling patterns
+	safeCreateDirectory(Output_dir + "/Scrambling")
+	temp = open(Output_dir + "/Scrambling/all.tsv", "w")
+	temp.close()
+	temp = open(Output_dir + "/Scrambling/scrambled.tsv", "w")
+	temp.close()
+	
 #------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 # This function runs rough BLAST and returns the hsp result list
@@ -489,10 +487,13 @@ updateGFF.mdsID = Options['MDS_id_start']
 
 # This function identifies best MIC contigs from which MAC was mapped and identifies scrambling
 
-def identifyScrambling(MIC_maps, MDS_List, Output_dir):
-	#MIC_maps.sort(key=lambda x: (float(x[11]), x[1]), reverse=True)
+def identify_MIC_patterns(MIC_maps, MDS_List, Output_dir):
 	if not MIC_maps:
 		return
+	# Variables for updating statistics on scrambled and complete
+	stat_Scrambled = False
+	stat_Complete = False
+	stat_CompletScrambled = False
 	# Build a map: MIC contig to the list of its hsps
 	cont_to_hsp = {}
 	
@@ -510,27 +511,113 @@ def identifyScrambling(MIC_maps, MDS_List, Output_dir):
 		cont_to_mds[mic] = mdsNUM
 	
 	MICs = list(cont_to_hsp.keys())
-	MICs.sort(key=lambda x: (cont_to_mds[x], float(cont_to_hsp[x][0][11]), len(cont_to_hsp[x])), reverse=True)
+	MICs.sort(key=lambda x: (cont_to_mds[x], float(cont_to_hsp[x][0][11])), reverse=True)
 	
-	out = open(Output_dir + "/Scrambling/All/" + MIC_maps[0][0] + ".tsv", "w")
+	out = open(Output_dir + "/Scrambling/all.tsv", "a")
 	for mic in MICs:
-		next = sorted(cont_to_hsp[mic], key=lambda x: int(x[7]))
+		next = sorted(cont_to_hsp[mic], key=lambda x: int(x[7]) if int(x[7]) < int(x[8]) else int(x[8]))
 		out.write(MIC_maps[0][0] + "\t" + mic + "\t" + "{")
 		for hsp in next[:-1]:
 			out.write(("-" if int(hsp[7]) > int(hsp[8]) else "") + str(hsp[-1]) + ",")
-		out.write(("-" if int(next[-1][7]) > int(next[-1][8]) else "") + str(next[-1][-1]) + "}\n")		
+		out.write(("-" if int(next[-1][7]) > int(next[-1][8]) else "") + str(next[-1][-1]) + "}\t")		
 		
 		# Check if this is a complete mapping
 		if cont_to_mds[mic] == len(MDS_List):
-			comp_out = open(Output_dir + "/Scrambling/Complete/" + MIC_maps[0][0] + ".tsv", "a")
-			comp_out.write(MIC_maps[0][0] + "\t" + mic + "\t" + "{")
-			for hsp in next[:-1]:
-				comp_out.write(("-" if int(hsp[7]) > int(hsp[8]) else "") + str(hsp[-1]) + ",")
-			comp_out.write(("-" if int(next[-1][7]) > int(next[-1][8]) else "") + str(next[-1][-1]) + "}\n")
-			comp_out.close()
+			stat_Complete = True
+			out.write("Complete\t")
+		else:
+			out.write("Incomplete\t")
 		
+		# check if it is a scrambled contig
+		if(is_Scrambled(next, len(MDS_List), cont_to_mds[mic] == len(MDS_List), Output_dir)):
+			stat_Scrambled = True
+			out.write("Scrambled\n")
+			
+			# Output scrambled MIC pattern
+			scramb_out = open(Output_dir + "/Scrambling/scrambled.tsv", "a")
+			scramb_out.write(MIC_maps[0][0] + "\t" + mic + "\t" + "{")
+			for hsp in next[:-1]:
+				scramb_out.write(("-" if int(hsp[7]) > int(hsp[8]) else "") + str(hsp[-1]) + ",")
+			scramb_out.write(("-" if int(next[-1][7]) > int(next[-1][8]) else "") + str(next[-1][-1]) + "}\t")
+			
+			# Check if this is a complete pattern
+			if cont_to_mds[mic] == len(MDS_List):
+				stat_CompletScrambled = True
+				scramb_out.write("Complete\n")
+			else:
+				scramb_out.write("Incomplete\n")
+			scramb_out.close()
+		else:
+			out.write("Non-Scrambled\n")
+			
+	# Update stats
+	if stat_Complete:
+		identify_MIC_patterns.scrambled += 1
+	if stat_Scrambled:
+		identify_MIC_patterns.complete += 1
+	if stat_CompletScrambled:
+		identify_MIC_patterns.complete_scrambled += 1
+			
 	out.close()
 
+identify_MIC_patterns.scrambled = 0
+identify_MIC_patterns.complete = 0
+identify_MIC_patterns.complete_scrambled = 0
+#------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+# This function checks whether a given arrangement is scrambled
+# Note: is_complete can be set to False when it is not known if a map is complete
+
+def is_Scrambled(MIC, mdsNum, is_complete, Output_dir):
+	# Get string of MIC pattern
+	s = ""
+	if is_complete:
+		# Build string directly
+		for hsp in MIC[:-1]:
+			s += ("-" if int(hsp[7]) > int(hsp[8]) else "") + str(hsp[-1]) + ","
+		s += ("-" if int(MIC[-1][7]) > int(MIC[-1][8]) else "") + str(MIC[-1][-1])
+	else:
+		# Get set of MDSs and turn it into sorted list
+		present_mdss = sorted(list({int(x[-1]) for x in MIC}))
+		# Get MDS index map
+		ind = 1
+		MDS_map = dict()
+		for mds in present_mdss:
+			MDS_map[mds] = ind
+			ind += 1
+		# Update mdsNum
+		mdsNum = ind - 1
+		
+		# Build string
+		for hsp in MIC[:-1]:
+			s += ("-" if int(hsp[7]) > int(hsp[8]) else "") + str(MDS_map[hsp[-1]]) + ","
+		s += ("-" if int(MIC[-1][7]) > int(MIC[-1][8]) else "") + str(MDS_map[MIC[-1][-1]])
+		
+	# Get regular expressions for non-scrambled patterns
+	r1 = ""
+	for i in range(1, mdsNum):
+		r1 += str(i) + ",(-?[0-9]*,)*"
+	r1 += str(mdsNum)
+	
+	r2 = ""
+	for i in range(mdsNum, 1, -1):
+		r2 += "-" + str(i) + ",(-?[0-9]*,)*"
+	r2 += "-1"
+	#print("Reg exp 1: ", r1)
+	#print("Reg exp 2: ", r2)
+	
+	# Check for non-scrambled pattern 1
+	r1_comp = re.compile(r1)
+	if r1_comp.search(s):
+		return False
+		
+	# Check for non-scrambled pattern 2
+	r2_comp = re.compile(r2)
+	if r2_comp.search(s):
+		return False
+	
+	# If program have not returned, then it is a scrambled pattern
+	return True
 	
 
 

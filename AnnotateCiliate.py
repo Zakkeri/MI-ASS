@@ -1,6 +1,6 @@
 # Used libraries
 import argparse
-import re
+import regex as re
 from io import StringIO
 from pyfasta import Fasta
 from operator import itemgetter
@@ -9,7 +9,7 @@ from EssentialFunctions import *
 
 # Debugging
 DEBUGGING = True
-time1 = time.time()
+time1 = datetime.now()
 
 # Define argument parser
 parser = argparse.ArgumentParser()
@@ -71,11 +71,11 @@ LogFile = None
 try:
 	os.makedirs(Output_dir)
 	LogFile = open(Output_dir + '/log.txt', 'w')
-	LogFile.write(datetime.datetime.now().strftime("%I:%M%p %B %d %Y") + ' - Directory ' + Output_dir + ' created\n')
+	LogFile.write(datetime.now().strftime("%I:%M%p %B %d %Y") + ' - Directory ' + Output_dir + ' created\n')
 except OSError as exception:
 	if exception.errno == errno.EEXIST:
 		LogFile = open(Output_dir + '/log.txt', 'w')
-		LogFile.write(datetime.datetime.now().strftime("%I:%M%p %B %d %Y") + ' - Directory ' + Output_dir + ' found\n')
+		LogFile.write(datetime.now().strftime("%I:%M%p %B %d %Y") + ' - Directory ' + Output_dir + ' found\n')
 	else:
 		raise
 
@@ -253,7 +253,7 @@ for contig in sorted(mac_fasta):
 	mapHSP_to_MDS(MIC_maps, MDS_List)
 	
 	# Output MIC annotation
-	MIC_maps.sort(key=lambda x: (x[1], int(x[7])))
+	MIC_maps.sort(key=lambda x: (x[1], int(x[7])) if int(x[7]) < int(x[8]) else (x[1], int(x[8])))
 	MIC_file = open(Output_dir + '/MIC_Annotation/' + str(contig) + '.tsv', 'w')
 	prevMIC = ""
 	for hsp in MIC_maps:
@@ -272,15 +272,20 @@ for contig in sorted(mac_fasta):
 	updateGFF(str(contig), MDS_List, Output_dir)
 	
 	# Identify scrambling on the best fitting MIC contigs
-	identifyScrambling(MIC_maps, MDS_List, Output_dir)
+	identify_MIC_patterns(MIC_maps, MDS_List, Output_dir)
 	
 	
-logComment("Annotation is finished! Total time spent: " + str(time.time() - time1) + " seconds")
+logComment("Annotation is finished! Total time spent: " + str(datetime.today() - time1))
+
+# Outputs stats
+logComment("MIC pattern stats:\n\nComplete MAC contigs: " + str(identify_MIC_patterns.complete) + "\nScrambled MAC contigs: " + 
+str(identify_MIC_patterns.scrambled) + "\nComplete and Scrambled: " + str(identify_MIC_patterns.complete_scrambled))
+
 # Close all files
 LogFile.close()
 
 #Debugging time spent
-print("Total time spent: ", time.time() - time1, " seconds")
+print("Total time spent: {}".format(datetime.today() - time1))
 
 
 
