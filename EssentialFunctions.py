@@ -75,6 +75,8 @@ def createOutputDirectories(Output_dir):
 	temp.close()
 	temp = open(Output_dir + "/Scrambling/scrambled.tsv", "w")
 	temp.close()
+	temp = open(Output_dir + "/Scrambling/maps.tsv", "w")
+	temp.close()
 	
 #------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -511,6 +513,8 @@ def identify_MIC_patterns(MIC_maps, MDS_List, Output_dir):
 		cont_to_mds[mic] = mdsNUM
 	
 	MICs = list(cont_to_hsp.keys())
+	# Sort by:
+	# 1) The biggest number of distinct MDSs MIC has and 2) The highest MIC coverage
 	MICs.sort(key=lambda x: (cont_to_mds[x], float(cont_to_hsp[x][0][11])), reverse=True)
 	
 	out = open(Output_dir + "/Scrambling/all.tsv", "a")
@@ -549,7 +553,28 @@ def identify_MIC_patterns(MIC_maps, MDS_List, Output_dir):
 			scramb_out.close()
 		else:
 			out.write("Non-Scrambled\n")
-			
+	
+	# Select the best MIC to MAC maps taken from the sorting procedure 
+	best_mic = MICs[0]
+	hsp_list = sorted(cont_to_hsp[best_mic], key=lambda x: int(x[7]) if int(x[7]) < int(x[8]) else int(x[8]))
+	# Process this contig and its hsp 
+	process_MIC_MAC_map(hsp_list, cont_to_mds[best_mic] == len(MDS_List), len(MDS_List), Output_dir)
+	
+	# If this is a complete map, then check if there are any other good mic maps and process them
+	if cont_to_mds[best_mic] == len(MDS_List):
+		for mic in MICs[1:]:
+			if cont_to_mds[mic] != len(MDS_List):
+				break
+			next = sorted(cont_to_hsp[mic], key=lambda x: int(x[7]) if int(x[7]) < int(x[8]) else int(x[8]))
+			process_MIC_MAC_map(next, cont_to_mds[mic] == len(MDS_List), len(MDS_List), Output_dir)
+	# Else, check for other MICs that have similar MDS number and MAC coverage
+	else:
+		rest_mic = [x for x in MICs if cont_to_mds[x] == cont_to_mds[best_mic] and float(cont_to_hsp[x][0][11]) == float(cont_to_hsp[best_mic][0][11])]
+		rest_mic.remove(best_mic)
+		for mic in rest_mic:
+			next = sorted(cont_to_hsp[mic], key=lambda x: int(x[7]) if int(x[7]) < int(x[8]) else int(x[8]))
+			process_MIC_MAC_map(next, cont_to_mds[mic] == len(MDS_List), len(MDS_List), Output_dir)
+	
 	# Update stats
 	if stat_Complete:
 		identify_MIC_patterns.scrambled += 1
@@ -619,14 +644,144 @@ def is_Scrambled(MIC, mdsNum, is_complete, Output_dir):
 	# If program have not returned, then it is a scrambled pattern
 	return True
 	
+#------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
+# This function saves current hsp as best MIC to MAC map, brings MIC arrangement into the standard form and reduces it
 
+def process_MIC_MAC_map(hsp_list, is_complete, mdsNum, Output_dir):
+	# First, get MIC arrangement
+	Arrangement_0 = []
+	if is_complete:
+		# Build arrangement directly
+		for hsp in hsp_list:
+			Arrangement_0.append(-hsp[-1] if int(hsp[7]) > int(hsp[8]) else hsp[-1])
+	else:
+		# Get set of MDSs and turn it into sorted list
+		present_mdss = sorted(list({int(x[-1]) for x in hsp_list}))
+		# Get MDS index map
+		ind = 1
+		MDS_map = dict()
+		for mds in present_mdss:
+			MDS_map[mds] = ind
+			ind += 1
+		# Update mdsNum
+		mdsNum = ind - 1
+		
+		# Build arrangement
+		for hsp in hsp_list:
+			Arrangement_0.append(-MDS_map[hsp[-1]] if int(hsp[7]) > int(hsp[8]) else MDS_map[hsp[-1]])
+	# Remove consecutive repeating letters (ex: 1, 2, 3, 3, 4, 5, 5, 5 - > 1, 2, 3, 4, 5)
+	Arrangement = [Arrangement_0[0]]
+	if len(Arrangement_0) > 1:
+		prev = Arrangement_0[0]
+		for m in Arrangement_0[1:]:
+			if m != prev:
+				Arrangement.append(m)
+				prev = m
+	
+	# Get arrangement in the canonical form
+	Arrangement = toCanonicalForm(Arrangement, mdsNum)
+	
+	# Get reduce arrangement
+	reduced = [Arrangement[0]]
+	if len(Arrangement) > 1:
+		prev = Arrangement[0]
+		for m in Arrangement[1:]:
+			# If both positive and increasing, continue
+			if m > 0 and prev > 0 and m == prev + 1:
+				prev = m
+				continue
+			# If both negative and decreasing, continue
+			elif m < 0 and prev < 0 and m == prev + 1:
+				prev = m
+				continue
+			# Else, append it to the reduced list
+			reduced.append(m)
+			prev = m
+	
+	# Get index map
+	ind = 1
+	Ind_map = dict()
+	for mds in sorted(list({abs(x) for x in reduced})):
+		Ind_map[mds] = ind
+		ind += 1
+	# Update mdsNum
+	mdsNum = ind - 1
+	
+	# Map mdss to for reduced arrangement
+	Reduced = []
+	for mds in reduced:
+		Reduced.append(-Ind_map[abs(mds)] if mds < 0 else Ind_map[abs(mds)])
+	
+	# Put reduced arrangement into teh canonical form
+	Reduced = toCanonicalForm(Reduced, mdsNum)
+	
+	# Output result
+	out = open(Output_dir + "/Scrambling/maps.tsv", "a")
+	out.write(hsp_list[0][0] + "\t" + hsp_list[0][1] + "\t" + "{" + arrangementToString(Arrangement) + "}\t{" + arrangementToString(Reduced) + "}\n")
+	out.close()
+	
+#------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
+# This function counts number of inverted MDSs in the arrangement
 
+def getNumber_Inv_MDS(Arrangement):
+	count = 0
+	for m in Arrangement:
+		if m < 0:
+			count += 1
+	return count
 
+#------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
+# This function puts arrangement to string
 
+def	arrangementToString(Arrangement):
+	s = ""
+	for m in Arrangement[:-1]:
+		s += str(m) + ", "
+	s += str(Arrangement[-1])
+	return s
 
+#------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+# This function returns the position of the first inversion in the arrangement
+
+def firstInv(Arrangement):
+	for i in range(0, len(Arrangement)):
+		if Arrangement[i] < 0:
+			return i+1
+	# No inversions
+	return 0
+
+#------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+# This function takes MIC arrangement return the canonical form of it
+
+def toCanonicalForm(Arrangement, mdsNum):
+	# Put arrangement in the right order:
+	# 1) minimal number of inversions, 2) lowest lexicographical order, 3) delay first inversion
+	# Get the other 3 arrangements first
+	Arrangement_I = []
+	for i in range(len(Arrangement) - 1, -1, -1):
+		m = Arrangement[i]
+		Arrangement_I.append(-1 * m)
+		
+	Arrangement_A = []
+	for m in Arrangement:
+		if m > 0:
+			Arrangement_A.append(-1 * (mdsNum + 1 - m))
+		else:
+			Arrangement_A.append(mdsNum + 1 - abs(m))
+			
+	Arrangement_AI = []
+	for i in range(len(Arrangement_A) - 1, -1, -1):
+		m = Arrangement_A[i]
+		Arrangement_AI.append(-1 * m)
+	# Put all arrangements in the list and sort it by above criterias
+	Arrangement_List = [Arrangement, Arrangement_I, Arrangement_A, Arrangement_AI]
+	Arrangement_List.sort(key=lambda x: (getNumber_Inv_MDS(x), arrangementToString(x), -firstInv(x)))
+	return Arrangement_List[0]
 
 
 
