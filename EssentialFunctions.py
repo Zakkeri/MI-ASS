@@ -5,6 +5,7 @@ import datetime
 import time
 import os.path
 import errno
+import math
 import regex as re
 from datetime import datetime
 from settings import *
@@ -61,6 +62,8 @@ def createOutputDirectories(Output_dir):
 		temp = open(Output_dir + '/Database_Input/mds.tsv', 'w')
 		temp.close()
 		temp = open(Output_dir + '/Database_Input/tel.tsv', 'w')
+		temp.close()
+		temp = open(Output_dir + '/Database_Input/arr.tsv', 'w')
 		temp.close()
 	
 	# Create output gff3 directory and file
@@ -223,8 +226,9 @@ def getMDS_Annotation(MDS_List, HSP_List, MAC_start, MAC_end):
 			break
 	
 	# Sort the MDS List
-	MDS_List.sort(key=lambda x: x[0])		
+	MDS_List.sort(key=lambda x: x[0])
 
+	
 #------------------------------------------------------------------------------------------------------------------------------------------------------------------
 # This function takes a list of MDSs (sorted by the MDS begining coordinate) and returns the intervals of the MAC covering
 
@@ -322,7 +326,7 @@ def getGapsList(MDS_List, MAC_start, MAC_end):
 
 # This function outputs annotation results into the database load file
 
-def updateDatabaseInput(MDS_List, MIC_maps, left_Tel, right_Tel, mac_length, Output_dir, contig):
+def updateDatabaseInput(MDS_List, MIC_maps, MIC_to_HSP, left_Tel, right_Tel, mac_length, Output_dir, contig):
 	# If MIC_maps are not empty, then update hsp file
 	if MIC_maps:
 		# Open hsp file to append
@@ -387,6 +391,47 @@ def updateDatabaseInput(MDS_List, MIC_maps, left_Tel, right_Tel, mac_length, Out
 		
 	telFile.close()
 
+	# Update arrange table file
+	arrFile = open(Output_dir + '/Database_Input/arr.tsv', 'a')
+	
+	# For each mic to mac map, output database entry
+	for mic in MIC_to_HSP:
+		# Get hsp list and declare variables
+		hsp_list = sorted(MIC_to_HSP[mic], key=lambda x: int(x[7]) if int(x[7]) < int(x[8]) else int(x[8]))
+		Arrangement = []
+		nuc_shared = 0
+		mismatch = 0
+		dist_mds = set()
+				
+		# Iterate through hsp_list and get all needed information
+		for hsp in hsp_list:
+			Arrangement.append(-hsp[-1] if int(hsp[7]) > int(hsp[8]) else hsp[-1])
+			nuc_shared += (int(hsp[3]) - int(hsp[4]))
+			mismatch += int(hsp[4])
+			dist_mds.add(hsp[-1])
+		
+		# Check if arrangement is scrambled
+		is_scrambled = is_Scrambled(hsp_list, len(MDS_List), len(MDS_List)==len(dist_mds))
+		# Put Arrangement into the canonical form
+		Arrangement = toCanonicalForm(Arrangement, len(MDS_List))
+		# Build arrangement string
+		arrangement = ""
+		for m in Arrangement[:-1]:
+			if m > 0:
+				arrangement += str(m) + ":0|" 
+			else:
+				arrangement += str(-m) + ":1|"
+		if Arrangement[-1] > 0:
+			arrangement += str(Arrangement[-1]) + ":0" 
+		else:
+			arrangement += str(-Arrangement[-1]) + ":1" 
+			
+		# Output arrangement table entry
+		arrFile.write("\\N\t" + contig + "\t\\N\t" + str(mac_length) + "\t" + hsp_list[0][11] + "\t" + mic + "\t" + "\t\\N\t\\N\t" + str(nuc_shared) + "\t\\N\t" + 
+					str(len(dist_mds)) + "\t" + str(mismatch) + "\t" + ("1" if is_scrambled else "0") + "\t" + arrangement + "\n")
+	
+	arrFile.close()
+	
 #------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 # This function sorts hsp list
@@ -489,37 +534,29 @@ updateGFF.mdsID = Options['MDS_id_start']
 
 # This function identifies best MIC contigs from which MAC was mapped and identifies scrambling
 
-def identify_MIC_patterns(MIC_maps, MDS_List, Output_dir):
+def identify_MIC_patterns(MIC_maps, MDS_List, MIC_to_HSP, Output_dir):
 	if not MIC_maps:
 		return
 	# Variables for updating statistics on scrambled and complete
 	stat_Scrambled = False
 	stat_Complete = False
 	stat_CompletScrambled = False
-	# Build a map: MIC contig to the list of its hsps
-	cont_to_hsp = {}
-	
-	for hsp in MIC_maps:
-		if hsp[1] in cont_to_hsp:
-			cont_to_hsp[hsp[1]].append(hsp)
-		else:
-			cont_to_hsp[hsp[1]] = [hsp]
 	
 	# map MIC contigs to number of distinct mdss it has
 	cont_to_mds = {}
 	
-	for mic in cont_to_hsp:
-		mdsNUM = len(set([x[-1] for x in cont_to_hsp[mic]]))
+	for mic in MIC_to_HSP:
+		mdsNUM = len(set([x[-1] for x in MIC_to_HSP[mic]]))
 		cont_to_mds[mic] = mdsNUM
 	
-	MICs = list(cont_to_hsp.keys())
+	MICs = list(MIC_to_HSP.keys())
 	# Sort by:
 	# 1) The biggest number of distinct MDSs MIC has and 2) The highest MIC coverage
-	MICs.sort(key=lambda x: (cont_to_mds[x], float(cont_to_hsp[x][0][11])), reverse=True)
+	MICs.sort(key=lambda x: (cont_to_mds[x], float(MIC_to_HSP[x][0][11])), reverse=True)
 	
 	out = open(Output_dir + "/Scrambling/all.tsv", "a")
 	for mic in MICs:
-		next = sorted(cont_to_hsp[mic], key=lambda x: int(x[7]) if int(x[7]) < int(x[8]) else int(x[8]))
+		next = sorted(MIC_to_HSP[mic], key=lambda x: int(x[7]) if int(x[7]) < int(x[8]) else int(x[8]))
 		out.write(MIC_maps[0][0] + "\t" + mic + "\t" + "{")
 		for hsp in next[:-1]:
 			out.write(("-" if int(hsp[7]) > int(hsp[8]) else "") + str(hsp[-1]) + ",")
@@ -533,7 +570,7 @@ def identify_MIC_patterns(MIC_maps, MDS_List, Output_dir):
 			out.write("Incomplete\t")
 		
 		# check if it is a scrambled contig
-		if(is_Scrambled(next, len(MDS_List), cont_to_mds[mic] == len(MDS_List), Output_dir)):
+		if(is_Scrambled(next, len(MDS_List), cont_to_mds[mic] == len(MDS_List))):
 			stat_Scrambled = True
 			out.write("Scrambled\n")
 			
@@ -556,7 +593,7 @@ def identify_MIC_patterns(MIC_maps, MDS_List, Output_dir):
 	
 	# Select the best MIC to MAC maps taken from the sorting procedure 
 	best_mic = MICs[0]
-	hsp_list = sorted(cont_to_hsp[best_mic], key=lambda x: int(x[7]) if int(x[7]) < int(x[8]) else int(x[8]))
+	hsp_list = sorted(MIC_to_HSP[best_mic], key=lambda x: int(x[7]) if int(x[7]) < int(x[8]) else int(x[8]))
 	# Process this contig and its hsp 
 	process_MIC_MAC_map(hsp_list, cont_to_mds[best_mic] == len(MDS_List), len(MDS_List), Output_dir)
 	
@@ -565,14 +602,14 @@ def identify_MIC_patterns(MIC_maps, MDS_List, Output_dir):
 		for mic in MICs[1:]:
 			if cont_to_mds[mic] != len(MDS_List):
 				break
-			next = sorted(cont_to_hsp[mic], key=lambda x: int(x[7]) if int(x[7]) < int(x[8]) else int(x[8]))
+			next = sorted(MIC_to_HSP[mic], key=lambda x: int(x[7]) if int(x[7]) < int(x[8]) else int(x[8]))
 			process_MIC_MAC_map(next, cont_to_mds[mic] == len(MDS_List), len(MDS_List), Output_dir)
 	# Else, check for other MICs that have similar MDS number and MAC coverage
 	else:
-		rest_mic = [x for x in MICs if cont_to_mds[x] == cont_to_mds[best_mic] and float(cont_to_hsp[x][0][11]) == float(cont_to_hsp[best_mic][0][11])]
+		rest_mic = [x for x in MICs if cont_to_mds[x] == cont_to_mds[best_mic] and float(MIC_to_HSP[x][0][11]) == float(MIC_to_HSP[best_mic][0][11])]
 		rest_mic.remove(best_mic)
 		for mic in rest_mic:
-			next = sorted(cont_to_hsp[mic], key=lambda x: int(x[7]) if int(x[7]) < int(x[8]) else int(x[8]))
+			next = sorted(MIC_to_HSP[mic], key=lambda x: int(x[7]) if int(x[7]) < int(x[8]) else int(x[8]))
 			process_MIC_MAC_map(next, cont_to_mds[mic] == len(MDS_List), len(MDS_List), Output_dir)
 	
 	# Update stats
@@ -590,10 +627,10 @@ identify_MIC_patterns.complete = 0
 identify_MIC_patterns.complete_scrambled = 0
 #------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-# This function checks whether a given arrangement is scrambled
+# This function checks whether a given arrangement given by hsp list is scrambled
 # Note: is_complete can be set to False when it is not known if a map is complete
 
-def is_Scrambled(MIC, mdsNum, is_complete, Output_dir):
+def is_Scrambled(MIC, mdsNum, is_complete):
 	# Get string of MIC pattern
 	s = ""
 	if is_complete:
@@ -713,7 +750,7 @@ def process_MIC_MAC_map(hsp_list, is_complete, mdsNum, Output_dir):
 	for mds in reduced:
 		Reduced.append(-Ind_map[abs(mds)] if mds < 0 else Ind_map[abs(mds)])
 	
-	# Put reduced arrangement into teh canonical form
+	# Put reduced arrangement into the canonical form
 	Reduced = toCanonicalForm(Reduced, mdsNum)
 	
 	# Output result
@@ -783,7 +820,63 @@ def toCanonicalForm(Arrangement, mdsNum):
 	Arrangement_List.sort(key=lambda x: (getNumber_Inv_MDS(x), arrangementToString(x), -firstInv(x)))
 	return Arrangement_List[0]
 
+#------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
+# This function takes MIC maps and MDS list and removes noise hsps from MIC_maps
+
+def removeNoise(MIC_maps, MDS_List):
+	if not MDS_List or not MIC_maps:
+		return
+	# First make a dictionary of MIC to its hsps
+	MIC_to_HSP = {}
+	for hsp in MIC_maps:
+		if hsp[1] in MIC_to_HSP:
+			MIC_to_HSP[hsp[1]].append(hsp)
+		else:
+			MIC_to_HSP[hsp[1]] = [hsp]
+			
+	# List of MICs to remove
+	MICtoRemove = []
+	
+	# Mark MICS that does not meet MDS threshold requirement
+	# 1) Check if there are any hsp that satisfies min hsp to mds ratio
+	# 2) Check if mds number percentage is satisfied
+	mdsNum = math.log(len([x for x in MDS_List if x[2] == 0]))
+	for mic in MIC_to_HSP:
+		hsp_list = MIC_to_HSP[mic]
+		is_Good = False
+		# Check for condition 1)
+		for hsp in hsp_list:
+			mds = MDS_List[hsp[-1] - 1]
+			if (mds[1] -  mds[0] + 1)/(float(hsp[3])) >= Options['Min_hsp_to_mds_ratio']:
+				is_Good = True
+				break
+		if is_Good:
+			continue
+		
+		# Check for condition 2)
+		distMDS = len({x[-1] for x in hsp_list})	
+		if math.log(distMDS)/mdsNum >= Options['Min_mds_num_percentage']:
+			continue
+			
+		# Else, add MIC as the one for removal
+		MICtoRemove.append(mic)
+		
+	# Filter MIC contigs that are bad
+	MIC_maps[:] = [x for x in MIC_maps if x[1] not in MICtoRemove]
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
 
 
 
