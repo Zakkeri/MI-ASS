@@ -410,8 +410,6 @@ def updateDatabaseInput(MDS_List, MIC_maps, MIC_to_HSP, left_Tel, right_Tel, mac
 			mismatch += int(hsp[4])
 			dist_mds.add(hsp[-1])
 		
-		# Check if arrangement is scrambled
-		is_scrambled = is_Scrambled(hsp_list, len(MDS_List), len(MDS_List)==len(dist_mds))
 		# Put Arrangement into the canonical form
 		Arrangement = toCanonicalForm(Arrangement, len(MDS_List))
 		# Build arrangement string
@@ -428,7 +426,8 @@ def updateDatabaseInput(MDS_List, MIC_maps, MIC_to_HSP, left_Tel, right_Tel, mac
 			
 		# Output arrangement table entry
 		arrFile.write("\\N\t" + contig + "\t\\N\t" + str(mac_length) + "\t" + hsp_list[0][11] + "\t" + mic + "\t" + "\t\\N\t\\N\t" + str(nuc_shared) + "\t\\N\t" + 
-					str(len(dist_mds)) + "\t" + str(mismatch) + "\t" + ("1" if is_scrambled else "0") + "\t" + arrangement + "\n")
+					str(len(dist_mds)) + "\t" + str(mismatch) + "\t" + ("1" if len(MDS_List) == len(dist_mds) else "0") + "\t" + 
+					("1" if is_Scrambled(hsp_list, len(MDS_List), len(MDS_List)==len(dist_mds)) else "0") + "\t" + arrangement + "\n")
 	
 	arrFile.close()
 	
