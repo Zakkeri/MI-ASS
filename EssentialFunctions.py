@@ -125,7 +125,7 @@ def run_Rough_BLAST(Output_dir, contig):
 	
 	# Filter duplicates out and parse result
 	res = [x.split(',') for x in list(set(roughVal))]
-	
+		
 	return res
 	
 #------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -425,7 +425,7 @@ def updateDatabaseInput(MDS_List, MIC_maps, MIC_to_HSP, left_Tel, right_Tel, mac
 			arrangement += str(-Arrangement[-1]) + ":1" 
 			
 		# Output arrangement table entry
-		arrFile.write("\\N\t" + contig + "\t\\N\t" + str(mac_length) + "\t" + hsp_list[0][11] + "\t" + mic + "\t" + "\t\\N\t\\N\t" + str(nuc_shared) + "\t\\N\t" + 
+		arrFile.write("\\N\t" + contig + "\t\\N\t" + str(mac_length) + "\t" + hsp_list[0][11] + "\t" + mic + "\t\\N\t\\N\t\\N\t" + str(nuc_shared) + "\t" +
 					str(len(dist_mds)) + "\t" + str(mismatch) + "\t" + ("1" if len(MDS_List) == len(dist_mds) else "0") + "\t" + 
 					("1" if is_Scrambled(hsp_list, len(MDS_List), len(MDS_List)==len(dist_mds)) else "0") + "\t" + arrangement + "\n")
 	

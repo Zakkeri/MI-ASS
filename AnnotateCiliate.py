@@ -201,14 +201,6 @@ for contig in sorted(mac_fasta):
 	else:
 		MIC_maps = list()
 	
-	# Make a map of MIC to its hsps
-	MIC_to_HSP = dict()
-	for hsp in MIC_maps:
-		if hsp[1] in MIC_to_HSP:
-			MIC_to_HSP[hsp[1]].append(hsp)
-		else:
-			MIC_to_HSP[hsp[1]] = [hsp]
-					
 	# Check if MAC is fully covered, and run fine pass if it is needed
 	if getGapsList(MDS_List, MAC_start, MAC_end):
 		# Run fine BLAST pass
@@ -221,17 +213,20 @@ for contig in sorted(mac_fasta):
 			
 			# Improve current annotation with fine BLAST results
 			getMDS_Annotation(MDS_List, fineBLAST, MAC_start, MAC_end)
-		
+			
+			# Make a map of MIC to its hsps
+			MIC_to_HSP = dict()
+			for hsp in MIC_maps:
+				if hsp[1] in MIC_to_HSP:
+					MIC_to_HSP[hsp[1]].append(hsp)
+				else:
+					MIC_to_HSP[hsp[1]] = [hsp]
+			
 			# Add fine BLAST hsp into MIC_maps list and MIC_to_HSP dictionary if fine hsp is not a subset of some rough hsp
 			for hsp in fineBLAST:
-				if hsp[1] not in MIC_to_HSP: 
+				if hsp[1] not in MIC_to_HSP or not [x for x in MIC_to_HSP[hsp[1]] if int(x[5]) <= int(hsp[5]) and int(x[6]) >= int(hsp[6])]:
 					MIC_maps.append(hsp)
-					MIC_to_HSP[hsp[1]] = [hsp]
-				elif not [x for x in MIC_to_HSP[hsp[1]] if int(x[5]) <= int(hsp[5]) and int(x[6]) >= int(hsp[6])]:
-					MIC_maps.append(hsp)
-					MIC_to_HSP[hsp[1]].append(hsp)
-					
-			
+	
 	# Check for gaps and add them to the MDS List
 	addGaps(MDS_List, MAC_start, MAC_end)	
 		
@@ -269,6 +264,15 @@ for contig in sorted(mac_fasta):
 		
 	MIC_file.close()
 
+	#!!!! Consider creating MIC_to_HSP list optional if user asks for certain function execution
+	# Make a map of MIC to its hsps for functions below
+	MIC_to_HSP = dict()
+	for hsp in MIC_maps:
+		if hsp[1] in MIC_to_HSP:
+			MIC_to_HSP[hsp[1]].append(hsp)
+		else:
+			MIC_to_HSP[hsp[1]] = [hsp]
+			
 	# Update database input files
 	if Options['DatabaseUpdate']:
 		updateDatabaseInput(MDS_List, MIC_maps, MIC_to_HSP, left_Tel_5, right_Tel_3, len(mac_fasta[contig]), Output_dir, str(contig))
