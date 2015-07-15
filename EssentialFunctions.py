@@ -821,7 +821,7 @@ def toCanonicalForm(Arrangement, mdsNum):
 
 #------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-# This function takes MIC maps and MDS list and removes noise hsps from MIC_maps
+""""# This function takes MIC maps and MDS list and removes noise hsps from MIC_maps
 
 def removeNoise(MIC_maps, MDS_List):
 	if not MDS_List or not MIC_maps:
@@ -863,7 +863,7 @@ def removeNoise(MIC_maps, MDS_List):
 		
 	# Filter MIC contigs that are bad
 	MIC_maps[:] = [x for x in MIC_maps if x[1] not in MICtoRemove]
-			
+"""			
 			
 			
 			

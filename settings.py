@@ -23,8 +23,8 @@ Options = {
 'MIC_Coverage_Threshold' : 10,
 'TelomericErrorTolerance' : 5,
 'MDS_id_start' : 1,
-'Min_hsp_to_mds_ratio' : 0.8,
-'Min_mds_num_percentage' : 0.5,
+#'Min_hsp_to_mds_ratio' : 0.8,
+#'Min_mds_num_percentage' : 0.5,
 #'Tel_Reg_Exp_5' : "((AA){0,1}(CCCCAA)+(CCCC){0,1})",
 #'Tel_Reg_Exp_3' : "((TT){0,1}(GGGGTT)+(GGGG){0,1})"
 'Tel_Reg_Exp_5' : "(A{0,4}(C{4}A{4})+C{0,4})|(C{0,4}(A{4}C{4})+A{0,4})|(A{1,4}C{4}A{1,4})|(C{1,4}A{4}C{1,4})",
