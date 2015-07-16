@@ -76,9 +76,7 @@ def createOutputDirectories(Output_dir):
 	safeCreateDirectory(Output_dir + "/Scrambling")
 	temp = open(Output_dir + "/Scrambling/all.tsv", "w")
 	temp.close()
-	temp = open(Output_dir + "/Scrambling/scrambled.tsv", "w")
-	temp.close()
-	temp = open(Output_dir + "/Scrambling/maps.tsv", "w")
+	temp = open(Output_dir + "/Scrambling/good_maps.tsv", "w")
 	temp.close()
 	
 #------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -553,6 +551,7 @@ def identify_MIC_patterns(MIC_maps, MDS_List, MIC_to_HSP, Output_dir):
 	# 1) The biggest number of distinct MDSs MIC has and 2) The highest MIC coverage
 	MICs.sort(key=lambda x: (cont_to_mds[x], float(MIC_to_HSP[x][0][11])), reverse=True)
 	
+	# Output all arrangements
 	out = open(Output_dir + "/Scrambling/all.tsv", "a")
 	for mic in MICs:
 		next = sorted(MIC_to_HSP[mic], key=lambda x: int(x[7]) if int(x[7]) < int(x[8]) else int(x[8]))
@@ -572,21 +571,6 @@ def identify_MIC_patterns(MIC_maps, MDS_List, MIC_to_HSP, Output_dir):
 		if(is_Scrambled(next, len(MDS_List), cont_to_mds[mic] == len(MDS_List))):
 			stat_Scrambled = True
 			out.write("Scrambled\n")
-			
-			# Output scrambled MIC pattern
-			scramb_out = open(Output_dir + "/Scrambling/scrambled.tsv", "a")
-			scramb_out.write(MIC_maps[0][0] + "\t" + mic + "\t" + "{")
-			for hsp in next[:-1]:
-				scramb_out.write(("-" if int(hsp[7]) > int(hsp[8]) else "") + str(hsp[-1]) + ",")
-			scramb_out.write(("-" if int(next[-1][7]) > int(next[-1][8]) else "") + str(next[-1][-1]) + "}\t")
-			
-			# Check if this is a complete pattern
-			if cont_to_mds[mic] == len(MDS_List):
-				stat_CompletScrambled = True
-				scramb_out.write("Complete\n")
-			else:
-				scramb_out.write("Incomplete\n")
-			scramb_out.close()
 		else:
 			out.write("Non-Scrambled\n")
 	
@@ -706,19 +690,45 @@ def process_MIC_MAC_map(hsp_list, is_complete, mdsNum, Output_dir):
 		# Build arrangement
 		for hsp in hsp_list:
 			Arrangement_0.append(-MDS_map[hsp[-1]] if int(hsp[7]) > int(hsp[8]) else MDS_map[hsp[-1]])
-	# Remove consecutive repeating letters (ex: 1, 2, 3, 3, 4, 5, 5, 5 - > 1, 2, 3, 4, 5)
-	Arrangement = [Arrangement_0[0]]
-	if len(Arrangement_0) > 1:
-		prev = Arrangement_0[0]
-		for m in Arrangement_0[1:]:
-			if m != prev:
-				Arrangement.append(m)
-				prev = m
 	
+	# Remove consecutive repeating letters (ex: 1, 2, 3, 3, 4, 5, 5, 5 - > 1, 2, 3, 4, 5)
+	Arrangement = []
+	removeRepeatingLetters(Arrangement_0, Arrangement)
+		
 	# Get arrangement in the canonical form
 	Arrangement = toCanonicalForm(Arrangement, mdsNum)
 	
-	# Get reduce arrangement
+	# Get reduced arrangement
+	Reduced = []
+	mdsNum = reduceArrangement(Arrangement, Reduced)
+	
+	# Put reduced arrangement into the canonical form
+	Reduced = toCanonicalForm(Reduced, mdsNum)
+	
+	# Output result
+	out = open(Output_dir + "/Scrambling/good_maps.tsv", "a")
+	out.write(hsp_list[0][0] + "\t" + hsp_list[0][1] + "\t" + "{" + arrangementToString(Arrangement) + "}\t{" + arrangementToString(Reduced) + "}\n")
+	out.close()
+
+#------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+# This function takes Arrangement_init, removes repeating letters and stores result in Arrangement_fin
+
+def removeRepeatingLetters(Arrangement_init, Arrangement_fin):
+	Arrangement_fin[:] = [Arrangement_init[0]]
+	if len(Arrangement_init) > 1:
+		prev = Arrangement_init[0]
+		for m in Arrangement_init[1:]:
+			if m != prev:
+				Arrangement_fin.append(m)
+				prev = m
+
+#------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+# This function takes Arrangement, reduces it by merging consecutive mdss, relabels mdss, stores result into the Arrangment_red list, and returns 
+# number of mdss
+
+def reduceArrangement(Arrangement, Arrangement_red):
 	reduced = [Arrangement[0]]
 	if len(Arrangement) > 1:
 		prev = Arrangement[0]
@@ -741,22 +751,16 @@ def process_MIC_MAC_map(hsp_list, is_complete, mdsNum, Output_dir):
 	for mds in sorted(list({abs(x) for x in reduced})):
 		Ind_map[mds] = ind
 		ind += 1
-	# Update mdsNum
-	mdsNum = ind - 1
+	# Get mds number
+	mdsNum = ind-1	
 	
 	# Map mdss to for reduced arrangement
-	Reduced = []
+	Arrangement_red[:] = []
 	for mds in reduced:
-		Reduced.append(-Ind_map[abs(mds)] if mds < 0 else Ind_map[abs(mds)])
+		Arrangement_red.append(-Ind_map[abs(mds)] if mds < 0 else Ind_map[abs(mds)])
 	
-	# Put reduced arrangement into the canonical form
-	Reduced = toCanonicalForm(Reduced, mdsNum)
-	
-	# Output result
-	out = open(Output_dir + "/Scrambling/maps.tsv", "a")
-	out.write(hsp_list[0][0] + "\t" + hsp_list[0][1] + "\t" + "{" + arrangementToString(Arrangement) + "}\t{" + arrangementToString(Reduced) + "}\n")
-	out.close()
-	
+	# Return number of mdss
+	return 	mdsNum
 #------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 # This function counts number of inverted MDSs in the arrangement
