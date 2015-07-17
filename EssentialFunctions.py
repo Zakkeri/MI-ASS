@@ -554,11 +554,15 @@ def identify_MIC_patterns(MIC_maps, MDS_List, MIC_to_HSP, Output_dir):
 	# Output all arrangements
 	out = open(Output_dir + "/Scrambling/all.tsv", "a")
 	for mic in MICs:
+		# Also, build MIC arrangement
+		Arrangement = []
 		next = sorted(MIC_to_HSP[mic], key=lambda x: int(x[7]) if int(x[7]) < int(x[8]) else int(x[8]))
 		out.write(MIC_maps[0][0] + "\t" + mic + "\t" + "{")
 		for hsp in next[:-1]:
 			out.write(("-" if int(hsp[7]) > int(hsp[8]) else "") + str(hsp[-1]) + ",")
+			Arrangement.append(-hsp[-1] if int(hsp[7]) > int(hsp[8]) else hsp[-1])
 		out.write(("-" if int(next[-1][7]) > int(next[-1][8]) else "") + str(next[-1][-1]) + "}\t")		
+		Arrangement.append(-next[-1][-1] if int(next[-1][7]) > int(next[-1][8]) else next[-1][-1])
 		
 		# Check if this is a complete mapping
 		if cont_to_mds[mic] == len(MDS_List):
@@ -570,10 +574,19 @@ def identify_MIC_patterns(MIC_maps, MDS_List, MIC_to_HSP, Output_dir):
 		# check if it is a scrambled contig
 		if(is_Scrambled(next, len(MDS_List), cont_to_mds[mic] == len(MDS_List))):
 			stat_Scrambled = True
-			out.write("Scrambled\n")
+			out.write("Scrambled\t")
 		else:
-			out.write("Non-Scrambled\n")
+			out.write("Non-Scrambled\t")
 	
+		# Get reduced arrangement and put it into canonical form
+		relabelMDS(Arrangement)
+		Arrangement_1 = []
+		removeRepeatingLetters(Arrangement, Arrangement_1)
+		mdsNumber = reduceArrangement(Arrangement_1, Arrangement)
+		Arrangement = toCanonicalForm(Arrangement, mdsNumber)
+		# Print to file
+		out.write("{" + arrangementToString(Arrangement) + "}\n")
+		
 	# Select the best MIC to MAC maps taken from the sorting procedure 
 	best_mic = MICs[0]
 	hsp_list = sorted(MIC_to_HSP[best_mic], key=lambda x: int(x[7]) if int(x[7]) < int(x[8]) else int(x[8]))
@@ -710,6 +723,27 @@ def process_MIC_MAC_map(hsp_list, is_complete, mdsNum, Output_dir):
 	out.write(hsp_list[0][0] + "\t" + hsp_list[0][1] + "\t" + "{" + arrangementToString(Arrangement) + "}\t{" + arrangementToString(Reduced) + "}\n")
 	out.close()
 
+#------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+# This function takes Arrangement, relabels all mdss to start from MDS 1, and return mds number
+
+def relabelMDS(Arrangement):
+	# Get set of MDSs and turn it into sorted list
+	present_mdss = sorted(list({abs(x) for x in Arrangement}))
+	# Get MDS index map
+	ind = 1
+	MDS_map = dict()
+	for mds in present_mdss:
+		MDS_map[mds] = ind
+		ind += 1
+	mdsNumber = ind-1
+		
+	# Relabel arrangement
+	for i in range(0, len(Arrangement)):
+		Arrangement[i] = (-MDS_map[abs(Arrangement[i])] if Arrangement[i] < 0 else MDS_map[abs(Arrangement[i])])
+		
+	return mdsNumber
+	
 #------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 # This function takes Arrangement_init, removes repeating letters and stores result in Arrangement_fin
