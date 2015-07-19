@@ -333,7 +333,7 @@ def updateDatabaseInput(MDS_List, MIC_maps, MIC_to_HSP, left_Tel, right_Tel, mac
 		# Output hsps to file
 		for hsp in MIC_maps:
 									
-			# Get MIC start, end, and orientation
+			# Get MIC start, end, and orientation, and telomeres
 			micStart = hsp[7]
 			micEnd = hsp[8]
 			micOrient = "+"
@@ -341,9 +341,9 @@ def updateDatabaseInput(MDS_List, MIC_maps, MIC_to_HSP, left_Tel, right_Tel, mac
 				micStart = hsp[8]
 				micEnd = hsp[7]
 				micOrient = "-"
-			
+			tels = 1 if left_Tel != None and right_Tel != None else 0
 			# Print hsp
-			hspFile.write("\\N\t" + hsp[0] + "\t\\N\t" + str(hsp[-1]) + "\t" + hsp[5] + "\t" + hsp[6] + "\t" + hsp[1] + 
+			hspFile.write("\\N\t" + hsp[0] + "\t\\N\t" + str(tels) + "\t" + str(hsp[-1]) + "\t" + hsp[5] + "\t" + hsp[6] + "\t" + hsp[1] + 
 			"\t\\N\t" + micStart + "\t" + micEnd + "\t" + micOrient + "\t" + hsp[3] + "\t" + hsp[2] + "\t" + hsp[4] + "\t" + hsp[9] + "\t" + hsp[10] + 
 			"\t" + hsp[11] + "\n")
 		
@@ -575,6 +575,9 @@ def identify_MIC_patterns(MIC_maps, MDS_List, MIC_to_HSP, Output_dir):
 		if(is_Scrambled(next, len(MDS_List), cont_to_mds[mic] == len(MDS_List))):
 			stat_Scrambled = True
 			out.write("Scrambled\t")
+			# Update stats for complete and scrambled
+			if cont_to_mds[mic] == len(MDS_List):
+				stat_CompletScrambled = True
 		else:
 			out.write("Non-Scrambled\t")
 	
