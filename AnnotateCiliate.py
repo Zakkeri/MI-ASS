@@ -21,8 +21,8 @@ parser.add_argument('-reblast', '--rb', dest='RB', action='store_true')
 # Get arguments
 if DEBUGGING:
 	# Pre-setup arguments for use on my computer/server directory
-	#args = parser.parse_args('-mic ../Assembly_Data/Tetrahymena/tet_therm_-_mic_nuc_(scaffold)_proc.fa -mac ../Assembly_Data/Tetrahymena/Test_File.fasta -o ../Output_Tetrohymena'.split())
-	args = parser.parse_args('-mic ../Assembly_Data/Trifallax/oxy_tri_-_mic_assembly_proc.fa -mac ../Assembly_Data/Trifallax/Test_File.fasta -o ../Output_Trifallax'.split())
+	args = parser.parse_args('-mic ../Assembly_Data/Tetrahymena/tet_therm_-_mic_nuc_(scaffold).fa -mac ../Assembly_Data/Tetrahymena/Test_File.fasta -o ../Output_Tetrohymena'.split())
+	#args = parser.parse_args('-mic ../Assembly_Data/Trifallax/oxy_tri_-_mic_assembly.fa -mac ../Assembly_Data/Trifallax/Test_File.fasta -o ../Output_Trifallax'.split())
 	#args = parser.parse_args('-mic Trifallax/oxy_tri_-_mic_assembly_proc.fa -mac Trifallax/oxy_tri_-_mac_assembly_(with_pacbio)_proc.fa -o Trifallax/Output'.split())
 	#args = parser.parse_args('-mic Tetrahymena/tet_therm_-_mic_nuc_(scaffold)_proc.fa -mac Tetrahymena/tet_therm_-_mac_nuc_proc.fa -o Tetrahymena/Output'.split())
 else:
@@ -99,6 +99,12 @@ logComment("BLAST version: " + output.decode(sys.stdout.encoding).split('\n')[0]
 
 # Create output directories
 createOutputDirectories(Output_dir)
+
+# Check if MIC hsp directory exists
+createMIC_hsp_files = False
+if not os.path.exists(Output_dir + "/hsp_mic"):
+	createMIC_hsp_files = True
+	safeCreateDirectory(Output_dir + "/hsp_mic")
 
 # Create BLAST database, if it doesn't exist
 if not os.path.exists(Output_dir + '/blast/mic.nsq'):
@@ -181,7 +187,7 @@ for contig in sorted(mac_fasta):
 	maskTel_file.close()
 	
 	# Run Rough BLAST pass
-	MIC_maps = readBLAST_file(Output_dir + "/hsp/rough/" + str(contig) + ".csv") if not ReBlast and os.path.isfile(Output_dir + "/hsp/rough/" + str(contig) + ".csv") else run_Rough_BLAST(Output_dir, str(contig))
+	MIC_maps = readBLAST_file(Output_dir + "/hsp_mac/rough/" + str(contig) + ".csv") if not ReBlast and os.path.isfile(Output_dir + "/hsp_mac/rough/" + str(contig) + ".csv") else run_Rough_BLAST(Output_dir, str(contig))
 		
 	# Get MAC start and MAC end with respect to telomeres
 	#print(left_Tel_5, " ", right_Tel_3)
@@ -193,6 +199,10 @@ for contig in sorted(mac_fasta):
 	# Build list of MDSs if there is a BLAST output
 	MDS_List = list()
 	if MIC_maps != "":
+		# Check if need to update MIC hsp files
+		if(createMIC_hsp_files):
+			update_MIC_hsp(MIC_maps, Output_dir)
+			
 		# Sort rough BLAST output
 		sortHSP_List(MIC_maps)
 		
@@ -204,10 +214,14 @@ for contig in sorted(mac_fasta):
 	# Check if MAC is fully covered, and run fine pass if it is needed
 	if getGapsList(MDS_List, MAC_start, MAC_end):
 		# Run fine BLAST pass
-		fineBLAST = readBLAST_file(Output_dir + "/hsp/fine/" + str(contig) + ".csv") if not ReBlast and os.path.isfile(Output_dir + "/hsp/fine/" + str(contig) + ".csv") else run_Fine_BLAST(Output_dir, str(contig))
+		fineBLAST = readBLAST_file(Output_dir + "/hsp_mac/fine/" + str(contig) + ".csv") if not ReBlast and os.path.isfile(Output_dir + "/hsp_mac/fine/" + str(contig) + ".csv") else run_Fine_BLAST(Output_dir, str(contig))
 		
 		# If there is a BLAST output, process it
 		if fineBLAST != "":
+			# Check if need to update MIC hsp files
+			if(createMIC_hsp_files):
+				update_MIC_hsp(fineBLAST, Output_dir)
+			
 			# Sort fine BLAST output 
 			sortHSP_List(fineBLAST)
 			
@@ -284,7 +298,55 @@ for contig in sorted(mac_fasta):
 	identify_MIC_patterns(MIC_maps, MDS_List, MIC_to_HSP, Output_dir)
 	
 	
-logComment("Annotation is finished! Total time spent: " + str(datetime.today() - time1))
+logComment("MAC annotation is finished! Total time spent: " + str(datetime.today() - time1))
+
+logComment("Starting MIC annotation...")
+time2 = datetime.today()
+
+# Open MIC fasta file
+mic_fasta = Fasta(MICfile)
+
+# For each file in the hsp_mic directory, annotate corresponding MIC
+for mic_file in os.listdir(Output_dir + "/hsp_mic"):
+	mic = mic_file.split(".")[0]
+	print("Annotating: " + mic)
+	HSP_List = readBLAST_file(Output_dir + "/hsp_mic/" + mic + ".csv")
+	
+	# Sort HSP list
+	sortHSP_List(HSP_List)
+			
+	# Get MDS annotation of MIC
+	MIC_MDS_List = list()
+	getMDS_Annotation(MIC_MDS_List, HSP_List, 1, len(mic_fasta[mic]))
+		
+	# Check for gaps and add them to the MDS List - this is MIC IESs
+	addGaps(MIC_MDS_List, 1, len(mic_fasta[mic]))	
+	
+	# Output MIC annotation for debugging purpose
+	MIC_MDS_List.sort(key=lambda x: x[0])
+	micOut = open(Output_dir + "/MDS_IES_MIC/" + mic + ".tsv", "w")
+	indexMDS = 1
+	indexIES = 0 if MIC_MDS_List[0][2] == 1 else 1
+	for m in MIC_MDS_List:
+		if m[2] == 0:
+			micOut.write("MDS_" + str(indexMDS) + "\t" + str(m[0]) + "\t" + str(m[1]) + "\t" + str(m[2]) + "\n")
+			m.append(indexMDS)
+			indexMDS += 1
+		else:
+			micOut.write("IES_" + str(indexIES) + "\t" + str(m[0]) + "\t" + str(m[1]) + "\t" + str(m[2]) + "\n")
+			m.append(indexIES)
+			indexIES += 1
+	micOut.close()
+	
+	# Update MIC annotation database file
+	micOut = open(Output_dir + '/Database_Input/mds.tsv', 'a')
+	for mds in MIC_MDS_List:
+		#Print mds
+		micOut.write("\\N\t\\N\t\\N\t" + mic + "\t" + str(mds[-1]) + "\t" + str(mds[0]) + "\t" + 
+		str(mds[1]) + "\t" + str(mds[1] - mds[0] + 1) + "\t" + str(mds[2]) + "\n")
+	micOut.close()
+	
+logComment("MIC annotation is finished! Total time spent: " + str(datetime.today() - time2))
 
 # Outputs stats
 logComment("MIC pattern stats:\n\nComplete MAC contigs: " + str(identify_MIC_patterns.complete) + "\nScrambled MAC contigs: " + 
