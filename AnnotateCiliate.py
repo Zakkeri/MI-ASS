@@ -308,7 +308,7 @@ mic_fasta = Fasta(MICfile)
 
 # For each file in the hsp_mic directory, annotate corresponding MIC
 for mic_file in os.listdir(Output_dir + "/hsp_mic"):
-	mic = mic_file.split(".")[0]
+	mic = os.path.splitext(mic_file)[0]
 	print("Annotating: " + mic)
 	HSP_List = readBLAST_file(Output_dir + "/hsp_mic/" + mic + ".csv")
 	
