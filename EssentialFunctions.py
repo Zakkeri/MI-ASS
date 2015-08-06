@@ -291,14 +291,14 @@ def addGaps(MDS_List, MAC_start, MAC_end):
 	if len(MAC_Interval) > 1:
 		prev = MAC_Interval[0]
 		for interv in MAC_Interval[1:]:
-			MDS_List.append([prev[1], interv[0],1])
+			MDS_List.append([prev[1]+1, interv[0]-1,1])
 			prev = interv
 			
 	# Check for gaps at the begining of MAC and at the end of MAC
 	if MAC_Interval[0][0] - MAC_start > 0:
-		MDS_List.append([MAC_start, MAC_Interval[0][0], 1])
+		MDS_List.append([MAC_start, MAC_Interval[0][0] - 1, 1])
 	if MAC_end - MAC_Interval[-1][1] > 0:
-		MDS_List.append([MAC_Interval[-1][1], MAC_end, 1])
+		MDS_List.append([MAC_Interval[-1][1] + 1, MAC_end, 1])
 #------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 # This function assigns MDS number to hsps that correspond to some MDS in MAC
@@ -334,20 +334,20 @@ def getGapsList(MDS_List, MAC_start, MAC_end):
 	
 	# Add gap at the begining, if needed
 	Gaps = list()
-	if MDS_List[0][0] - MAC_start > 1:
-		Gaps.append([MAC_start, MDS_List[0][0]])
+	if MDS_List[0][0] - MAC_start > 0:
+		Gaps.append([MAC_start, MDS_List[0][0]-1])
 	
 	# If there are more than one MDS, then add gaps in between MDSs
 	if len(MDS_List) > 1:
 		prev = MDS_List[0]
 		for x in MDS_List[1:]:
-			if x[0] - prev[1] > 1:
+			if x[0] - prev[1] > 0:
 				Gaps.append([prev[1], x[0]])
 			prev = x
 	
 	# Check if there is a gap at the end	
-	if MAC_end - MDS_List[-1][1] > 1:
-		Gaps.append([MDS_List[-1][1], MAC_end])
+	if MAC_end - MDS_List[-1][1] > 0:
+		Gaps.append([MDS_List[-1][1]+1, MAC_end])
 		
 	return Gaps
 #------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -408,12 +408,12 @@ def updateDatabaseInput(MDS_List, MIC_maps, MIC_to_HSP, left_Tel, right_Tel, mac
 	telFile.write("\\N\t\\N\t" + contig + "\t" + str(mac_length) + "\t" + str(tel_num) + "\t")
 	# Info about left telomere
 	if left_Tel:
-		telFile.write(str(left_Tel[0]+1) + "\t" + str(left_Tel[1]+1) + "\t" + str(left_Tel[1] - left_Tel[0] + 1) + "\t")
+		telFile.write(str(left_Tel[0]) + "\t" + str(left_Tel[1]) + "\t" + str(left_Tel[1] - left_Tel[0] + 1) + "\t")
 	else:
 		telFile.write("\\N\t\\N\t0\t")
 	# infor about right telomere
 	if right_Tel:
-		telFile.write(str(right_Tel[0]+1) + "\t" + str(right_Tel[1]+1) + "\t" + str(right_Tel[1] - right_Tel[0] + 1) + "\n")
+		telFile.write(str(right_Tel[0]) + "\t" + str(right_Tel[1]) + "\t" + str(right_Tel[1] - right_Tel[0] + 1) + "\n")
 	else:
 		telFile.write("\\N\t\\N\t0\n")	
 		
@@ -482,7 +482,7 @@ def identifyTelomere(reg_exp, seq, tel_seq, side):
 	
 	# Get the list of telomeric sequences
 	telomeres = reg_exp.finditer(seq)
-	tel_positions = sorted([(m.span()[0], m.span()[1]) for m in telomeres])
+	tel_positions = sorted([(m.span()[0] + 1, m.span()[1] + 1) for m in telomeres])
 	# If this is a 5' telomeres
 	if side == 5:
 		# Go through each telomeric seq and build a telomere

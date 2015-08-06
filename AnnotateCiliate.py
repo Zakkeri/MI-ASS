@@ -23,8 +23,8 @@ if DEBUGGING:
 	# Pre-setup arguments for use on my computer/server directory
 	args = parser.parse_args('-mic ../Assembly_Data/Tetrahymena/tet_therm_-_mic_nuc_(scaffold).fa -mac ../Assembly_Data/Tetrahymena/Test_File.fasta -o ../Output_Tetrohymena'.split())
 	#args = parser.parse_args('-mic ../Assembly_Data/Trifallax/oxy_tri_-_mic_assembly.fa -mac ../Assembly_Data/Trifallax/Test_File.fasta -o ../Output_Trifallax'.split())
-	#args = parser.parse_args('-mic Trifallax/oxy_tri_-_mic_assembly_proc.fa -mac Trifallax/oxy_tri_-_mac_assembly_(with_pacbio)_proc.fa -o Trifallax/Output'.split())
-	#args = parser.parse_args('-mic Tetrahymena/tet_therm_-_mic_nuc_(scaffold)_proc.fa -mac Tetrahymena/tet_therm_-_mac_nuc_proc.fa -o Tetrahymena/Output'.split())
+	#args = parser.parse_args('-mic Trifallax/oxy_tri_-_mic_assembly.fa -mac Trifallax/oxy_tri_-_mac_assembly_(with_pacbio).fa -o Trifallax/Output'.split())
+	#args = parser.parse_args('-mic Tetrahymena/tet_therm_-_mic_nuc_(scaffold).fa -mac Tetrahymena/tet_therm_-_mac_nuc.fa -o Tetrahymena/Output'.split())
 else:
 	args = parser.parse_args()
 
@@ -175,10 +175,10 @@ for contig in sorted(mac_fasta):
 	tel_seq.sort()
 	str_pos = 0
 	for coord in tel_seq:
-		if str_pos != coord[0]:
-			maskTel_file.write(seq[str_pos:coord[0]].upper())
-		maskTel_file.write(seq[coord[0]:coord[1]].lower())
-		str_pos = coord[1]
+		if str_pos != (coord[0] - 1):
+			maskTel_file.write(seq[str_pos:(coord[0]-1)].upper())
+		maskTel_file.write(seq[(coord[0]-1):(coord[1]-1)].lower())
+		str_pos = coord[1] - 1
 	# If there are still some letters left to print, print them
 	if str_pos != len(seq):
 		maskTel_file.write(seq[str_pos:len(seq)].upper())
