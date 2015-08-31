@@ -1,6 +1,11 @@
 MDS/IES - Annotation Sequence Software (MI-ASS)
 
-Libraries used:
+Software used:
+Basic Local Alignment Search Tool (BLAST) of version 2.2.29+ or higher
+The download page is:
+http://blast.ncbi.nlm.nih.gov/Blast.cgi?PAGE_TYPE=BlastDocs&DOC_TYPE=Download
+
+Python libraries used:
 1) Pyfasta
 2) Numpy (as a part of Pyfasta)
 3) Regex 
