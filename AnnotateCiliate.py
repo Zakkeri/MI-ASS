@@ -21,10 +21,10 @@ parser.add_argument('-reblast', '--rb', dest='RB', action='store_true')
 # Get arguments
 if DEBUGGING:
 	# Pre-setup arguments for use on my computer/server directory
-	args = parser.parse_args('-mic ../Assembly_Data/Tetrahymena/tet_therm_-_mic_nuc_(scaffold).fa -mac ../Assembly_Data/Tetrahymena/Test_File.fasta -o ../Output_Tetrohymena'.split())
-	#args = parser.parse_args('-mic ../Assembly_Data/Trifallax/oxy_tri_-_mic_assembly.fa -mac ../Assembly_Data/Trifallax/Test_File.fasta -o ../Output_Trifallax'.split())
-	#args = parser.parse_args('-mic Trifallax/oxy_tri_-_mic_assembly.fa -mac Trifallax/oxy_tri_-_mac_assembly_(with_pacbio).fa -o Trifallax/Output'.split())
-	#args = parser.parse_args('-mic Tetrahymena/tet_therm_-_mic_nuc_(scaffold).fa -mac Tetrahymena/tet_therm_-_mac_nuc.fa -o Tetrahymena/Output'.split())
+	#args = parser.parse_args('-mic ../Assembly_Data/Tetrahymena/tet_therm_-_mic_nuc_(scaffold).fa -mac ../Assembly_Data/Tetrahymena/Test_File.fasta -o ../Output_Tetrohymena'.split())
+	args = parser.parse_args('-mic ../Assembly_Data/Trifallax/oxytri_mic_nuc_Proc.fa -mac ../Assembly_Data/Trifallax/Test_File.fasta -o ../Output_Trifallax'.split())
+	#args = parser.parse_args('-mic Trifallax/oxytri_mic_nuc_Proc.fa -mac Trifallax/oxytri_mac_nuc_Proc.fa -o Trifallax/Output'.split())
+	#args = parser.parse_args('-mic Tetrahymena/ttherm_mic_nuc_Proc.fa -mac Tetrahymena/ttherm_mac_nuc_Proc.fa -o Tetrahymena/Output'.split())
 else:
 	args = parser.parse_args()
 
@@ -342,7 +342,7 @@ for mic_file in os.listdir(Output_dir + "/hsp_mic"):
 	micOut = open(Output_dir + '/Database_Input/mds.tsv', 'a')
 	for mds in MIC_MDS_List:
 		#Print mds
-		micOut.write("\\N\t\\N\t\\N\t" + mic + "\t" + str(mds[-1]) + "\t" + str(mds[0]) + "\t" + 
+		micOut.write("\\N\t\\N\t" + mic + "\t" + str(mds[-1]) + "\t" + str(mds[0]) + "\t" + 
 		str(mds[1]) + "\t" + str(mds[1] - mds[0] + 1) + "\t" + str(mds[2]) + "\n")
 	micOut.close()
 	

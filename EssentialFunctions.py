@@ -88,7 +88,7 @@ def createOutputDirectories(Output_dir):
 
 def run_Rough_BLAST(Output_dir, contig):
 	# Set up parameters
-	param = ("blastn -task " + Options['RoughBlastTask'] + " -word_size " + str(Options['RoughBlastWordSize']) + " -max_hsps 0 -max_target_seqs 10000 -dust").split(" ")
+	param = ("blastn -task " + Options['RoughBlastTask'] + " -word_size " + str(Options['RoughBlastWordSize']) + " -max_hsps 10000 -max_target_seqs 10000 -dust").split(" ")
 	
 	if Options['RoughBlastDust']:
 		param.append("yes")
@@ -134,7 +134,7 @@ def run_Rough_BLAST(Output_dir, contig):
 # This function runs fine BLAST and returns hsp result list
 
 def run_Fine_BLAST(Output_dir, contig):
-	param = ("blastn -task " + Options['FineBlastTask'] + " -word_size " + str(Options['FineBlastWordSize']) + " -max_hsps 0 -max_target_seqs 10000 -dust").split(" ")
+	param = ("blastn -task " + Options['FineBlastTask'] + " -word_size " + str(Options['FineBlastWordSize']) + " -max_hsps 10000 -max_target_seqs 10000 -dust").split(" ")
  	
 	if Options['FineBlastDust']:
 		param.append("yes")
@@ -373,7 +373,7 @@ def updateDatabaseInput(MDS_List, MIC_maps, MIC_to_HSP, left_Tel, right_Tel, mac
 				micOrient = "-"
 			tels = 1 if left_Tel != None and right_Tel != None else 0
 			# Print hsp
-			hspFile.write("\\N\t" + hsp[0] + "\t\\N\t" + str(tels) + "\t" + str(hsp[-1]) + "\t" + hsp[5] + "\t" + hsp[6] + "\t" + hsp[1] + 
+			hspFile.write("\\N\t\\N\t" + hsp[0] + "\t\\N\t" + str(tels) + "\t" + str(hsp[-1]) + "\t" + hsp[5] + "\t" + hsp[6] + "\t\\N\t" + hsp[1] + 
 			"\t\\N\t" + micStart + "\t" + micEnd + "\t" + micOrient + "\t" + hsp[3] + "\t" + hsp[2] + "\t" + hsp[4] + "\t" + hsp[9] + "\t" + hsp[10] + 
 			"\t" + hsp[11] + "\n")
 		
@@ -388,7 +388,7 @@ def updateDatabaseInput(MDS_List, MIC_maps, MIC_to_HSP, left_Tel, right_Tel, mac
 		# Output mdss to file
 		for mds in MDS_List:
 			#Print mds
-			mdsFile.write("\\N\t\\N\t\\N\t" + contig + "\t" + str(mds[-1]) + "\t" + str(mds[0]) + "\t" + 
+			mdsFile.write("\\N\t\\N\t" + contig + "\t" + str(mds[-1]) + "\t" + str(mds[0]) + "\t" + 
 			str(mds[1]) + "\t" + str(mds[1] - mds[0] + 1) + "\t" + str(mds[2]) + "\n")
 		
 		# Close mds file
@@ -405,7 +405,7 @@ def updateDatabaseInput(MDS_List, MIC_maps, MIC_to_HSP, left_Tel, right_Tel, mac
 		tel_num += 1
 	
 	# Output to file
-	telFile.write("\\N\t\\N\t" + contig + "\t" + str(mac_length) + "\t" + str(tel_num) + "\t")
+	telFile.write("\\N\t\\N\t\\N\t" + contig + "\t" + str(mac_length) + "\t" + str(tel_num) + "\t")
 	# Info about left telomere
 	if left_Tel:
 		telFile.write(str(left_Tel[0]) + "\t" + str(left_Tel[1]) + "\t" + str(left_Tel[1] - left_Tel[0] + 1) + "\t")
@@ -453,7 +453,7 @@ def updateDatabaseInput(MDS_List, MIC_maps, MIC_to_HSP, left_Tel, right_Tel, mac
 			arrangement += str(-Arrangement[-1]) + ":1" 
 			
 		# Output arrangement table entry
-		arrFile.write("\\N\t" + contig + "\t\\N\t" + str(mac_length) + "\t" + hsp_list[0][11] + "\t" + mic + "\t\\N\t\\N\t\\N\t" + str(nuc_shared) + "\t" +
+		arrFile.write("\\N\t\\N\t" + contig + "\t\\N\t" + str(mac_length) + "\t" + hsp_list[0][11] + "\t\\N\t" + mic + "\t\\N\t\\N\t\\N\t" + str(nuc_shared) + "\t" +
 					str(len(dist_mds)) + "\t" + str(mismatch) + "\t" + ("1" if len(MDS_List) == len(dist_mds) else "0") + "\t" + 
 					("1" if is_Scrambled(hsp_list, len(MDS_List), len(MDS_List)==len(dist_mds)) else "0") + "\t" + arrangement + "\n")
 	
@@ -543,7 +543,7 @@ def identifyTelomere(reg_exp, seq, tel_seq, side):
 #------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 # This function updates mac_mds.gff3 file
-
+#TODO: make this function more universal and take gff file name to update, and distinguis between MIC and MAC gff
 def updateGFF(contig, MDS_List, Output_dir):
 	# Open gff file
 	gff = open(Output_dir + "/GFF/mac_mds.gff3", "a")
