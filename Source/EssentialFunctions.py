@@ -197,10 +197,10 @@ def update_MIC_hsp(MIC_maps, Output_dir):
 			out_file.close()
 			out_file = open(Output_dir + "/hsp_mic/" + current + ".csv", "a")
 		# Flip coordinates, to indicate inversion
-		start = hsp[5] if int(hsp[7]) < int(hsp[8]) else hsp[6]
-		end = hsp[6] if start == hsp[5] else hsp[5]
+		start = hsp[7] if int(hsp[7]) < int(hsp[8]) else hsp[8]
+		end = hsp[8] if start == hsp[7] else hsp[7]
 		# Store hsp value with query and search values flipped
-		out_file.write(hsp[1] + "," + hsp[0] + "," + hsp[2] + "," + hsp[3] + "," + hsp[4] + "," + hsp[7] + "," + hsp[8] + "," + start + "," + end + "," + hsp[9] + "," + hsp[10] + "," + hsp[11] + "\n")
+		out_file.write(hsp[1] + "," + hsp[0] + "," + hsp[2] + "," + hsp[3] + "," + hsp[4] + "," + start + "," + end + "," + hsp[5] + "," + hsp[6] + "," + hsp[9] + "," + hsp[10] + "," + hsp[11] + "\n")
 	
 	out_file.close()
 #------------------------------------------------------------------------------------------------------------------------------------------------------------------

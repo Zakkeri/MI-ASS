@@ -313,7 +313,9 @@ for mic_file in os.listdir(Output_dir + "/hsp_mic"):
 	mic = os.path.splitext(mic_file)[0]
 	print("Annotating: " + mic)
 	HSP_List = readBLAST_file(Output_dir + "/hsp_mic/" + mic + ".csv")
-	
+	if HSP_List == "":
+		continue
+
 	# Sort HSP list
 	sortHSP_List(HSP_List)
 			
