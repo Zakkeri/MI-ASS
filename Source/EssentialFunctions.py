@@ -66,9 +66,12 @@ def createOutputDirectories(Output_dir):
 		temp = open(Output_dir + '/Database_Input/arr.tsv', 'w')
 		temp.close()
 	
-	# Create output gff3 directory and file
+	# Create output gff3 directory and files
 	safeCreateDirectory(Output_dir + '/GFF')
-	gffFile = open(Output_dir + "/GFF/mac_mds.gff3", "w")
+	gffFile = open(Output_dir + "/GFF/mac_annotation.gff3", "w")
+	gffFile.write("##gff-version 3\n")
+	gffFile.close()
+	gffFile = open(Output_dir + "/GFF/mic_annotation.gff3", "w")
 	gffFile.write("##gff-version 3\n")
 	gffFile.close()
 	
@@ -193,10 +196,11 @@ def update_MIC_hsp(MIC_maps, Output_dir):
 			current = hsp[1]
 			out_file.close()
 			out_file = open(Output_dir + "/hsp_mic/" + current + ".csv", "a")
+		# Flip coordinates, to indicate inversion
+		start = hsp[5] if int(hsp[7]) < int(hsp[8]) else hsp[6]
+		end = hsp[6] if start == hsp[5] else hsp[5]
 		# Store hsp value with query and search values flipped
-		start = hsp[7] if int(hsp[7]) < int(hsp[8]) else hsp[8]
-		end = hsp[8] if start == hsp[7] else hsp[7]
-		out_file.write(hsp[1] + "," + hsp[0] + "," + hsp[2] + "," + hsp[3] + "," + hsp[4] + "," + start + "," + end + "," + hsp[5] + "," + hsp[6] + "," + hsp[9] + "," + hsp[10] + "," + hsp[11] + "\n")
+		out_file.write(hsp[1] + "," + hsp[0] + "," + hsp[2] + "," + hsp[3] + "," + hsp[4] + "," + hsp[7] + "," + hsp[8] + "," + start + "," + end + "," + hsp[9] + "," + hsp[10] + "," + hsp[11] + "\n")
 	
 	out_file.close()
 #------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -438,8 +442,15 @@ def updateDatabaseInput(MDS_List, MIC_maps, MIC_to_HSP, left_Tel, right_Tel, mac
 			mismatch += int(hsp[4])
 			dist_mds.add(hsp[-1])
 		
-		# Put Arrangement into the canonical form
-		Arrangement = toCanonicalForm(Arrangement, len(MDS_List))
+		""""# Put Arrangement into the least inversion form
+		Arrangement_I = []
+		for i in range(len(Arrangement) - 1, -1, -1):
+			m = Arrangement[i]
+			Arrangement_I.append(-1 * m)
+		if getNumber_Inv_MDS(Arrangement_I)	< getNumber_Inv_MDS(Arrangement):
+			Arrangement = Arrangement_I
+		#Arrangement = toCanonicalForm(Arrangement, len(MDS_List))
+		"""
 		# Build arrangement string
 		arrangement = ""
 		for m in Arrangement[:-1]:
@@ -542,20 +553,31 @@ def identifyTelomere(reg_exp, seq, tel_seq, side):
 	
 #------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-# This function updates mac_mds.gff3 file
-#TODO: make this function more universal and take gff file name to update, and distinguis between MIC and MAC gff
-def updateGFF(contig, MDS_List, Output_dir):
-	# Open gff file
-	gff = open(Output_dir + "/GFF/mac_mds.gff3", "a")
+# This function updates gff files, option distinguishes between 1 - mac and 2 - mic annotation files
+
+def updateGFF(contig, MDS_List, Output_dir, option):
+
+	# Output gff annotation for MAC
+	if option == 1:
+		# Open gff file
+		gff = open(Output_dir + "/GFF/mac_annotation.gff3", "a")
 		
-	# Output every mds
-	for mds in MDS_List:
-		gff.write(contig + "\tMI-ASS\tmds\t" + str(mds[0]) + "\t" + str(mds[1]) + "\t" + ".\t.\t.\tID=mds{0:06d};".format(updateGFF.mdsID) + "Name=mds_" + str(mds[-1]) + ";Target=" + contig + "\n")
-		updateGFF.mdsID += 1
+		# Output every mds
+		for mds in MDS_List:
+			gff.write(contig + "\tMI-ASS\tmds\t" + str(mds[0]) + "\t" + str(mds[1]) + "\t" + ".\t.\t.\tName=mds_" + str(mds[-1]) + ";Target=" + contig + "\n")
+			
+		gff.close()
+	# Output gff annotation for MIC
+	else:
+		# Open gff file
+		gff = open(Output_dir + "/GFF/mic_annotation.gff3", "a")
+		
+		# Output every mds
+		for mds in MDS_List:
+			gff.write(contig + "\tMI-ASS\t" + ("mds" if mds[2] == 0 else "ies") + "\t" + str(mds[0]) + "\t" + str(mds[1]) + "\t" + ".\t.\t.\tName=" + ("mds_" if mds[2] == 0 else "ies_") + str(mds[-1]) + ";Target=" + contig + "\n")
+			
+		gff.close()
 	
-	gff.close()
-	
-updateGFF.mdsID = Options['MDS_id_start']
 	
 #------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -891,64 +913,4 @@ def toCanonicalForm(Arrangement, mdsNum):
 	return Arrangement_List[0]
 
 #------------------------------------------------------------------------------------------------------------------------------------------------------------------
-
-""""# This function takes MIC maps and MDS list and removes noise hsps from MIC_maps
-
-def removeNoise(MIC_maps, MDS_List):
-	if not MDS_List or not MIC_maps:
-		return
-	# First make a dictionary of MIC to its hsps
-	MIC_to_HSP = {}
-	for hsp in MIC_maps:
-		if hsp[1] in MIC_to_HSP:
-			MIC_to_HSP[hsp[1]].append(hsp)
-		else:
-			MIC_to_HSP[hsp[1]] = [hsp]
-			
-	# List of MICs to remove
-	MICtoRemove = []
-	
-	# Mark MICS that does not meet MDS threshold requirement
-	# 1) Check if there are any hsp that satisfies min hsp to mds ratio
-	# 2) Check if mds number percentage is satisfied
-	mdsNum = math.log(len([x for x in MDS_List if x[2] == 0]))
-	for mic in MIC_to_HSP:
-		hsp_list = MIC_to_HSP[mic]
-		is_Good = False
-		# Check for condition 1)
-		for hsp in hsp_list:
-			mds = MDS_List[hsp[-1] - 1]
-			if (mds[1] -  mds[0] + 1)/(float(hsp[3])) >= Options['Min_hsp_to_mds_ratio']:
-				is_Good = True
-				break
-		if is_Good:
-			continue
-		
-		# Check for condition 2)
-		distMDS = len({x[-1] for x in hsp_list})	
-		if math.log(distMDS)/mdsNum >= Options['Min_mds_num_percentage']:
-			continue
-			
-		# Else, add MIC as the one for removal
-		MICtoRemove.append(mic)
-		
-	# Filter MIC contigs that are bad
-	MIC_maps[:] = [x for x in MIC_maps if x[1] not in MICtoRemove]
-"""			
-			
-			
-			
-			
-			
-			
-			
-			
-			
-			
-			
-			
-
-
-
-
 

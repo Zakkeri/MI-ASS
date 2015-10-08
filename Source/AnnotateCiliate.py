@@ -8,7 +8,7 @@ from settings import *
 from EssentialFunctions import *
 
 # Debugging
-DEBUGGING = True
+DEBUGGING = False
 time1 = datetime.now()
 
 # Define argument parser
@@ -21,8 +21,8 @@ parser.add_argument('-reblast', '--rb', dest='RB', action='store_true')
 # Get arguments
 if DEBUGGING:
 	# Pre-setup arguments for use on my computer/server directory
-	#args = parser.parse_args('-mic ../Assembly_Data/Tetrahymena/tet_therm_-_mic_nuc_(scaffold).fa -mac ../Assembly_Data/Tetrahymena/Test_File.fasta -o ../Output_Tetrohymena'.split())
-	args = parser.parse_args('-mic ../Assembly_Data/Trifallax/oxytri_mic_nuc_Proc.fa -mac ../Assembly_Data/Trifallax/Test_File.fasta -o ../Output_Trifallax'.split())
+	#args = parser.parse_args('-mic ../../Assembly_Data/Tetrahymena/ttherm_mic_nuc_Proc.fa -mac ../../Assembly_Data/Tetrahymena/Test_File.fasta -o ../../Output_Tetrohymena'.split())
+	args = parser.parse_args('-mic ../../Assembly_Data/Trifallax/oxytri_mic_nuc_Proc.fa -mac ../../Assembly_Data/Trifallax/Test_File.fasta -o ../../Output_Trifallax'.split())
 	#args = parser.parse_args('-mic Trifallax/oxytri_mic_nuc_Proc.fa -mac Trifallax/oxytri_mac_nuc_Proc.fa -o Trifallax/Output'.split())
 	#args = parser.parse_args('-mic Tetrahymena/ttherm_mic_nuc_Proc.fa -mac Tetrahymena/ttherm_mac_nuc_Proc.fa -o Tetrahymena/Output'.split())
 else:
@@ -152,8 +152,7 @@ logComment("BLAST fine pass parameters:\nblastn -task " + Options['FineBlastTask
 logComment('Annotating ' + str(macCount) + ' MAC contigs...')
 
 for contig in sorted(mac_fasta):
-	if DEBUGGING:
-		print("Annotating: ", str(contig))
+	print("Annotating: ", str(contig))
 
 	# create file for masked telomeres
 	maskTel_file = open(Output_dir + '/Masked_Contigs/' + str(contig) + '.fa', 'w')
@@ -244,39 +243,42 @@ for contig in sorted(mac_fasta):
 	# Check for gaps and add them to the MDS List
 	addGaps(MDS_List, MAC_start, MAC_end)	
 		
-	# Output results and label MDSs
-	MDS_file = open(Output_dir + '/Annotated_MDS/' + str(contig) + '.tsv', 'w')
-	ind = 1
-	MDS_List.sort(key = lambda x: x[0])
+	# Debugging: Output results and label MDSs
+	if DEBUGGING:
+		MDS_file = open(Output_dir + '/Annotated_MDS/' + str(contig) + '.tsv', 'w')
+		ind = 1
+		MDS_List.sort(key = lambda x: x[0])
 	
-	for mds in MDS_List[:-1]:
-		MDS_file.write(str(ind) + '\t' + str(mds[0]) + '\t' + str(mds[1]) + '\t' + str(mds[2]) + '\n')
-		mds.append(ind)
-		ind += 1
-	MDS_file.write(str(ind) + '\t' + str(MDS_List[-1][0]) + '\t' + str(MDS_List[-1][1]) + '\t' + str(MDS_List[-1][2]))
-	MDS_List[-1].append(ind)
-	MDS_file.close()
-	
+		for mds in MDS_List[:-1]:
+			MDS_file.write(str(ind) + '\t' + str(mds[0]) + '\t' + str(mds[1]) + '\t' + str(mds[2]) + '\n')
+			mds.append(ind)
+			ind += 1
+		MDS_file.write(str(ind) + '\t' + str(MDS_List[-1][0]) + '\t' + str(MDS_List[-1][1]) + '\t' + str(MDS_List[-1][2]))
+		MDS_List[-1].append(ind)
+		MDS_file.close()
+	# Label MDSs
+	else:
+		ind = 1
+		MDS_List.sort(key = lambda x: x[0])
+		for mds in MDS_List:
+			mds.append(ind)
+			ind += 1
+				
 	# Annotate hsp with current MDS list
 	mapHSP_to_MDS(MIC_maps, MDS_List)
 	
-	# Remove noise hsps
-	#try:
-	#	removeNoise(MIC_maps, MDS_List)
-	#except Exception as e:
-	#	logComment("Error in remove noise function:\n\n" + str(e))
-	
 	# Output MIC annotation
 	MIC_maps.sort(key=lambda x: (x[1], int(x[7])) if int(x[7]) < int(x[8]) else (x[1], int(x[8])))
-	MIC_file = open(Output_dir + '/MIC_Annotation/' + str(contig) + '.tsv', 'w')
-	prevMIC = ""
-	for hsp in MIC_maps:
-		if hsp[1] != prevMIC:
-			MIC_file.write(hsp[1] + '\tMDS\tMAC start\tMAC end\tMIC start\tMIC end\n')
-			prevMIC = hsp[1]
-		MIC_file.write('\t' + str(hsp[-1]) + '\t' + hsp[5] + '\t' + hsp[6] + '\t' + hsp[7] + '\t' + hsp[8] + '\n')
+	if DEBUGGING:
+		MIC_file = open(Output_dir + '/MIC_Annotation/' + str(contig) + '.tsv', 'w')
+		prevMIC = ""
+		for hsp in MIC_maps:
+			if hsp[1] != prevMIC:
+				MIC_file.write(hsp[1] + '\tMDS\tMAC start\tMAC end\tMIC start\tMIC end\n')
+				prevMIC = hsp[1]
+			MIC_file.write('\t' + str(hsp[-1]) + '\t' + hsp[5] + '\t' + hsp[6] + '\t' + hsp[7] + '\t' + hsp[8] + '\n')
 		
-	MIC_file.close()
+		MIC_file.close()
 
 	#!!!! Consider creating MIC_to_HSP list optional if user asks for certain function execution
 	# Make a map of MIC to its hsps for functions below
@@ -292,7 +294,7 @@ for contig in sorted(mac_fasta):
 		updateDatabaseInput(MDS_List, MIC_maps, MIC_to_HSP, left_Tel_5, right_Tel_3, len(mac_fasta[contig]), Output_dir, str(contig))
 		
 	# Update gff file
-	updateGFF(str(contig), MDS_List, Output_dir)
+	updateGFF(str(contig), MDS_List, Output_dir, 1)
 	
 	# Identify scrambling on the best fitting MIC contigs
 	identify_MIC_patterns(MIC_maps, MDS_List, MIC_to_HSP, Output_dir)
@@ -324,19 +326,30 @@ for mic_file in os.listdir(Output_dir + "/hsp_mic"):
 	
 	# Output MIC annotation for debugging purpose
 	MIC_MDS_List.sort(key=lambda x: x[0])
-	micOut = open(Output_dir + "/MDS_IES_MIC/" + mic + ".tsv", "w")
-	indexMDS = 1
-	indexIES = 0 if MIC_MDS_List[0][2] == 1 else 1
-	for m in MIC_MDS_List:
-		if m[2] == 0:
-			micOut.write("MDS_" + str(indexMDS) + "\t" + str(m[0]) + "\t" + str(m[1]) + "\t" + str(m[2]) + "\n")
-			m.append(indexMDS)
-			indexMDS += 1
-		else:
-			micOut.write("IES_" + str(indexIES) + "\t" + str(m[0]) + "\t" + str(m[1]) + "\t" + str(m[2]) + "\n")
-			m.append(indexIES)
-			indexIES += 1
-	micOut.close()
+	if DEBUGGING:
+		micOut = open(Output_dir + "/MDS_IES_MIC/" + mic + ".tsv", "w")
+		indexMDS = 1
+		indexIES = 0 if MIC_MDS_List[0][2] == 1 else 1
+		for m in MIC_MDS_List:
+			if m[2] == 0:
+				micOut.write("MDS_" + str(indexMDS) + "\t" + str(m[0]) + "\t" + str(m[1]) + "\t" + str(m[2]) + "\n")
+				m.append(indexMDS)
+				indexMDS += 1
+			else:
+				micOut.write("IES_" + str(indexIES) + "\t" + str(m[0]) + "\t" + str(m[1]) + "\t" + str(m[2]) + "\n")
+				m.append(indexIES)
+				indexIES += 1
+		micOut.close()
+	else:
+		indexMDS = 1
+		indexIES = 0 if MIC_MDS_List[0][2] == 1 else 1
+		for m in MIC_MDS_List:
+			if m[2] == 0:
+				m.append(indexMDS)
+				indexMDS += 1
+			else:
+				m.append(indexIES)
+				indexIES += 1
 	
 	# Update MIC annotation database file
 	micOut = open(Output_dir + '/Database_Input/mds.tsv', 'a')
@@ -345,6 +358,9 @@ for mic_file in os.listdir(Output_dir + "/hsp_mic"):
 		micOut.write("\\N\t\\N\t" + mic + "\t" + str(mds[-1]) + "\t" + str(mds[0]) + "\t" + 
 		str(mds[1]) + "\t" + str(mds[1] - mds[0] + 1) + "\t" + str(mds[2]) + "\n")
 	micOut.close()
+	
+	# Update MIC gff file
+	updateGFF(str(mic), MIC_MDS_List, Output_dir, 2)
 	
 logComment("MIC annotation is finished! Total time spent: " + str(datetime.today() - time2))
 
