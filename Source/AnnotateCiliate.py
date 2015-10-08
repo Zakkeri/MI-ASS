@@ -324,12 +324,17 @@ for mic_file in os.listdir(Output_dir + "/hsp_mic"):
 	# Check for gaps and add them to the MDS List - this is MIC IESs
 	addGaps(MIC_MDS_List, 1, len(mic_fasta[mic]))	
 	
-	# Output MIC annotation for debugging purpose
+	# Remove IESs on the ends
 	MIC_MDS_List.sort(key=lambda x: x[0])
+	if MIC_MDS_List[0][2] == 1:
+		MIC_MDS_List.pop(0)
+	if MIC_MDS_List[-1][2] == 1:
+		MIC_MDS_List.pop(-1)
+	# Output MIC annotation for debugging purpose
 	if DEBUGGING:
 		micOut = open(Output_dir + "/MDS_IES_MIC/" + mic + ".tsv", "w")
 		indexMDS = 1
-		indexIES = 0 if MIC_MDS_List[0][2] == 1 else 1
+		indexIES = 1
 		for m in MIC_MDS_List:
 			if m[2] == 0:
 				micOut.write("MDS_" + str(indexMDS) + "\t" + str(m[0]) + "\t" + str(m[1]) + "\t" + str(m[2]) + "\n")
@@ -342,7 +347,7 @@ for mic_file in os.listdir(Output_dir + "/hsp_mic"):
 		micOut.close()
 	else:
 		indexMDS = 1
-		indexIES = 0 if MIC_MDS_List[0][2] == 1 else 1
+		indexIES = 1
 		for m in MIC_MDS_List:
 			if m[2] == 0:
 				m.append(indexMDS)
