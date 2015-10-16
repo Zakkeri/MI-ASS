@@ -1,6 +1,6 @@
 The MIT License (MIT)
 
-Copyright (c) 2015 Jonathan Burns, Denys Kukushkin, University of South Florida
+Copyright (c) 2015 USF Math-Bio Lab
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
